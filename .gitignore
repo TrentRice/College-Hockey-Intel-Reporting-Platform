@@ -1,0 +1,15 @@
+
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+
+# All data. College Hockey News allows personal, non-commercial use only, so none of it is
+# published here (docs/schema.md). Rebuild locally with the scrapers, then `make validate` / `make ids`.
+data/**
+!data/*/
+!data/*/.gitkeep
+data/processed/validation/
