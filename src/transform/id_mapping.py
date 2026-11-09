@@ -41,7 +41,9 @@ Outputs (data/processed/ids/):
   team_seasons.csv      team_id, season, conference
   players.csv           player_id, chn_player_id, name, position, first_season, last_season,
                         n_seasons
-  player_seasons.csv    player_id, season, team_id, name, name_key, position, games, link
+  player_seasons.csv    player_id, season, team_id, name, position, games, link  (the roster)
+  player_names.csv      player_id, season, team_id, name, name_key  (every spelling; the
+                        lookup the loader uses and the registry the next run reads)
   player_id_merges.csv  old_player_id, new_player_id, merged_on
 """
 
@@ -274,6 +276,9 @@ def link_player_seasons(ps: pd.DataFrame) -> pd.DataFrame:
     for later, earlier in transfers.items():
         uf.union(later, earlier)
     ps["group"] = [uf.find(i) for i in range(len(ps))]
+    # the season before a transfer was 'single_season' until the transfer joined it on
+    joined = ps.group.map(ps.group.value_counts()) > 1
+    ps.loc[joined & (ps.link == "single_season"), "link"] = "name_transfer"
     return ps
 
 
@@ -395,34 +400,47 @@ def build(data_dir: Path = DATA_DIR, out_dir: Path = OUT_DIR) -> dict[str, pd.Da
 
     appearances = player_appearances(tables, teams.id_by_name())
     ps = link_player_seasons(player_seasons_from(appearances))
-    ps, merges = assign_player_ids(
-        ps, read_previous("player_seasons.csv", out_dir), read_previous("players.csv", out_dir)
-    )
+    # player_names.csv is the registry: every (season, team, spelling) -> player_id
+    prev_names = read_previous("player_names.csv", out_dir)
+    if prev_names is None:
+        prev_names = read_previous("player_seasons.csv", out_dir)  # older layout
+    ps, merges = assign_player_ids(ps, prev_names, read_previous("players.csv", out_dir))
     prev_merges = read_previous("player_id_merges.csv", out_dir)
     if prev_merges is not None:
         merges = pd.concat([prev_merges, merges], ignore_index=True)
 
-    ps = ps.sort_values(["season", "team_id", "player_id"])[
-        [
-            "player_id",
-            "season",
-            "team_id",
-            "name",
-            "name_key",
-            "position",
-            "games",
-            "chn_player_id",
-            "link",
-        ]
-    ]
+    ps = ps.sort_values(["season", "team_id", "player_id", "games"], ascending=[1, 1, 1, 0])
+    names = ps[["player_id", "season", "team_id", "name", "name_key"]]
     return {
         "teams.csv": teams.teams,
         "team_aliases.csv": teams.aliases,
         "team_seasons.csv": teams.seasons,
         "players.csv": players_from(ps),
-        "player_seasons.csv": ps.drop(columns="chn_player_id"),
+        "player_seasons.csv": roster_from(ps),
+        "player_names.csv": names,
         "player_id_merges.csv": merges,
     }
+
+
+LINK_RANK = {
+    "chn_id": 0,
+    "team_and_name": 1,
+    "name_transfer": 2,
+    "single_season": 3,
+    "ambiguous": 4,
+}
+
+
+def roster_from(ps: pd.DataFrame) -> pd.DataFrame:
+    """One row per player, season and team. A player CHN spells two ways in one season
+    ('Jake' / 'Jacob Leblanc', linked by CHN id) is one roster row under the spelling with
+    the most games; every spelling stays in player_names.csv."""
+    ps = ps.sort_values(["player_id", "season", "team_id", "games"], ascending=[1, 1, 1, 0])
+    g = ps.groupby(["player_id", "season", "team_id"], sort=False)
+    out = g.first()[["name", "position"]]
+    out["games"] = g.games.sum()
+    out["link"] = g.link.agg(lambda s: min(s, key=LINK_RANK.__getitem__))
+    return out.reset_index().sort_values(["season", "team_id", "player_id"]).reset_index(drop=True)
 
 
 def main() -> None:

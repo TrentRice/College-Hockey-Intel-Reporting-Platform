@@ -1,0 +1,52 @@
+# Local stack: Postgres + the CHIRP API. Start with `make api-up` (or `make db-up` for the
+# database alone).
+#
+# PRIVATE BY DESIGN. College Hockey News allows personal use only, so every published port
+# is bound to 127.0.0.1: reachable from this machine, refused from any network. Never change
+# a port to the "8000:8000" form (that listens on every network, and Docker bypasses the Mac
+# firewall), and never use network_mode: host.
+services:
+  db:
+    image: postgres:17
+    container_name: chirp-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hockey}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hockey}
+      POSTGRES_DB: ${POSTGRES_DB:-hockey}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"   # this machine only (for VS Code, the loader)
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  api:
+    build: .
+    image: chirp-api:local
+    container_name: chirp-api
+    env_file:
+      - path: .env          # API_KEY comes from here at startup; it is never in the image
+        required: false
+    environment:
+      # inside Docker's private network the database is "db", not localhost
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hockey}:${POSTGRES_PASSWORD:-hockey}@db:5432/${POSTGRES_DB:-hockey}
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"        # this machine only
+    depends_on:
+      db:
+        condition: service_healthy
+    # hardening: read-only filesystem, no Linux capabilities, no privilege escalation
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  pgdata:

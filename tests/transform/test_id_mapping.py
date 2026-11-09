@@ -143,7 +143,7 @@ def test_transfer_without_a_goal_is_linked_by_name():
     )
     ps, _ = resolve(t)
     assert ps.player_id.nunique() == 1
-    assert ps.set_index("season").link["2030-31"] == "name_transfer"
+    assert set(ps.link) == {"name_transfer"}  # both sides of the move
 
 
 def test_transfer_rule_skips_one_to_many():

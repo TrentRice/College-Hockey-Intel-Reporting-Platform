@@ -1,4 +1,4 @@
-.PHONY: setup lint format test up down logs train serve clean validate ids
+.PHONY: setup lint format test up api-up down logs train serve clean validate ids db-up db-down db-reset load psql
 
 # Install dependencies
 setup:
@@ -18,19 +18,15 @@ format:
 test:
 	uv run pytest -v
 
-# Start local stack (API + MLflow + Postgres)
-up:
-	docker compose up --build
+# Start the API and Postgres in Docker, in the background (http://127.0.0.1:8000/docs)
+up api-up:
+	docker compose up -d --build --wait
 
-# Start local stack in background
-up-detached:
-	docker compose up --build -d
-
-# Stop local stack
+# Stop the stack (data is kept in the pgdata volume)
 down:
 	docker compose down
 
-# Tail logs from local stack
+# Tail logs from the stack
 logs:
 	docker compose logs -f
 
@@ -46,6 +42,27 @@ validate:
 ids:
 	uv run python -m src.transform.id_mapping
 
+# Start the Postgres database in Docker (waits until it accepts connections)
+db-up:
+	docker compose up -d --wait db
+
+# Stop the database (data is kept in the pgdata volume)
+db-down:
+	docker compose stop db
+
+# Delete the database and its volume, then start it empty
+db-reset:
+	docker compose down -v
+	docker compose up -d --wait db
+
+# Load the processed CSVs + id tables into Postgres (full refresh, one transaction)
+load:
+	uv run python -m src.db.load
+
+# Open a SQL prompt on the database (tables are in the `hockey` schema)
+psql:
+	docker compose exec -e PGOPTIONS="-c search_path=hockey" db psql -U hockey -d hockey
+
 # Build features
 features:
 	python -m src.features.build_features
@@ -54,9 +71,9 @@ features:
 train:
 	python -m src.models.train --model $(MODEL)
 
-# Run the serving app locally without Docker
+# Run the API at http://127.0.0.1:8000 (docs at /docs). Localhost only: CHN data stays private
 serve:
-	uvicorn src.serving.app:app --reload --host 0.0.0.0 --port 8000
+	uv run uvicorn src.api.main:app --reload --host 127.0.0.1 --port 8000
 
 # Remove caches, build artifacts
 clean:

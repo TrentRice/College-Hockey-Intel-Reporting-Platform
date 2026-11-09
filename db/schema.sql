@@ -5,10 +5,12 @@
 -- across reloads; the CHN ids are kept as attributes for tracing back to the source.
 --
 -- Load order: seasons, conferences, teams, team_aliases, team_seasons, players,
--- player_seasons, player_id_merges, games, then the fact tables.
+-- player_seasons, player_names, player_id_merges, games, then the fact tables.
 -- See docs/schema.md for the diagram and how ids are assigned.
 
 CREATE SCHEMA IF NOT EXISTS hockey;
+-- Accent-insensitive search ('Jeremie' finds 'Jérémie'); lives in public, outside the reload
+CREATE EXTENSION IF NOT EXISTS unaccent SCHEMA public;
 SET search_path TO hockey;
 
 -- ----------------------------------------------------------------------------
@@ -21,8 +23,7 @@ CREATE TABLE seasons (
 );
 
 CREATE TABLE conferences (
-    conference_id  SMALLSERIAL PRIMARY KEY,
-    name           TEXT NOT NULL UNIQUE                           -- 'Hockey East'
+    conference  TEXT PRIMARY KEY                                  -- 'Hockey East'
 );
 
 CREATE TABLE teams (
@@ -42,7 +43,7 @@ CREATE TABLE team_aliases (
 CREATE TABLE team_seasons (
     team_id        INTEGER NOT NULL REFERENCES teams,
     season         TEXT NOT NULL REFERENCES seasons,
-    conference_id  SMALLINT REFERENCES conferences,   -- NULL for non-D1
+    conference     TEXT REFERENCES conferences,       -- NULL for non-D1
     PRIMARY KEY (team_id, season)
 );
 
@@ -66,6 +67,16 @@ CREATE TABLE player_seasons (
                                'single_season', 'ambiguous')),
     PRIMARY KEY (player_id, season, team_id)
 );
+
+-- Every spelling a player appeared under (CHN writes some names two ways in one season).
+CREATE TABLE player_names (
+    player_id  INTEGER NOT NULL REFERENCES players,
+    season     TEXT NOT NULL REFERENCES seasons,
+    team_id    INTEGER NOT NULL REFERENCES teams,
+    name       TEXT NOT NULL,
+    PRIMARY KEY (season, team_id, name)
+);
+CREATE INDEX player_names_player_idx ON player_names (player_id);
 
 -- Ids retired when new data showed two ids were one player. Lets the API redirect old ids.
 CREATE TABLE player_id_merges (
@@ -101,7 +112,7 @@ CREATE TABLE games (
     asst_referees    TEXT[],
     box_score_url    TEXT,
     source           TEXT NOT NULL DEFAULT 'college_hockey_news',
-    CHECK (home_team_id IS DISTINCT FROM away_team_id)
+    CHECK (home_team_id <> away_team_id)       -- passes when either side is TBD (NULL)
 );
 CREATE INDEX games_season_idx ON games (season);
 CREATE INDEX games_home_idx   ON games (home_team_id, game_date);

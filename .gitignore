@@ -13,3 +13,6 @@ data/**
 !data/*/
 !data/*/.gitkeep
 data/processed/validation/
+
+# Local secrets (API key, database password)
+.env

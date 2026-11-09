@@ -22,12 +22,15 @@ class Settings(BaseSettings):
     mlflow_model_name: str = "my-model"
     mlflow_model_stage: str = "Production"
 
-    # Database
-    database_url: str = "postgresql://mlflow:changeme@localhost:5432/mlflow"
+    # Database: the hockey database from docker-compose.yml (make db-up)
+    database_url: str = "postgresql://hockey:hockey@localhost:5432/hockey"
 
     # Serving app
-    api_host: str = "0.0.0.0"
+    api_host: str = "127.0.0.1"  # this machine only; see docs/schema.md "Data source and use"
     api_port: int = 8000
+    # Required in the X-API-Key header when set. Generate one with:
+    #   python -c "import secrets; print(secrets.token_urlsafe(32))"
+    api_key: str = ""
 
     # AWS (only required for deploy)
     aws_region: str = "us-east-1"

@@ -1,0 +1,12 @@
+# Allowlist: the image gets only what the API needs. Everything else, including .env
+# (secrets) and data/ (CHN data, personal use only), never enters the build.
+*
+!pyproject.toml
+!uv.lock
+!config/
+!src/
+!db/
+
+# and nothing generated inside those
+**/__pycache__
+**/*.pyc

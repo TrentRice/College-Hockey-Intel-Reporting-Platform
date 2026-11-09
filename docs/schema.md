@@ -14,6 +14,7 @@ erDiagram
     teams ||--o{ team_aliases : ""
     teams ||--o{ player_seasons : ""
     players ||--o{ player_seasons : ""
+    players ||--o{ player_names : "spellings"
     players ||--o{ player_id_merges : "redirects"
     seasons ||--o{ games : ""
     teams ||--o{ games : "home / away"
@@ -31,12 +32,13 @@ erDiagram
 | Table | Grain | Source |
 |---|---|---|
 | `seasons` | one per season (`2025-26`) | |
-| `conferences` | one per conference | `all_games` |
+| `conferences` | one per conference, keyed by name | `all_games` |
 | `teams` | one per team; D1 teams carry `chn_team_id` | `ids/teams.csv` |
 | `team_aliases` | every name a team appears under ("Rensselaer", "RPI") | `ids/team_aliases.csv` |
 | `team_seasons` | team × season, with that season's conference | `ids/team_seasons.csv` |
 | `players` | one per real player | `ids/players.csv` |
 | `player_seasons` | player × season × team (the roster), with that season's spelling | `ids/player_seasons.csv` |
+| `player_names` | every spelling of a player per season and team (CHN writes some names two ways, e.g. "Jake" / "Jacob Leblanc") | `ids/player_names.csv` |
 | `player_id_merges` | retired ids → the id that replaced them | `ids/player_id_merges.csv` |
 | `games` | one per scheduled game | `all_games` + `box_games` |
 | `team_game_stats` | team × game | `box_team_stats` |
@@ -47,6 +49,30 @@ erDiagram
 
 The views `skater_season_totals`, `goalie_season_totals` and `team_season_totals` add up the
 fact tables by season (points, save %, GAA, PP %, PK %, faceoff %).
+
+## Loading the database
+
+```
+make db-up     # start Postgres 17 in Docker (docker-compose.yml)
+make ids       # assign team/player ids
+make load      # load everything into the `hockey` schema
+make psql      # SQL prompt
+```
+
+[src/db/load.py](../src/db/load.py) does a **full refresh** in a single transaction. It drops
+the `hockey` schema, recreates it from `db/schema.sql`, and refills every table using `COPY`.
+That takes about a second for two seasons. Anyone querying sees the old data until the commit
+and the new data right after it, never a half-loaded database. Ids come from
+`data/processed/ids/`, not from the database, so they stay the same on every reload.
+
+The loader is strict. Any team or player name in a box score that doesn't map to an id stops
+the load, rather than leaving the id empty. The only NULLs are real ones: goals with no
+credited scorer, bench penalties, and TBD opponents. Before committing, it also checks that
+every table's row count matches its CSV and that the season-total views add up to the box
+scores. If either check fails, the whole load is rolled back.
+
+Connection settings come from `DATABASE_URL` (default
+`postgresql://hockey:hockey@localhost:5432/hockey`; see `.env.example`).
 
 ## How IDs are assigned
 
@@ -62,10 +88,10 @@ into players, and each `player_seasons.link` records which rule did it:
 
 | `link` | Rule | Player-seasons |
 |---|---|---:|
-| `chn_id` | the player scored, so CHN's player id identifies them (this also catches transfers and spelling changes like "Joseph" → "JJ Grainda") | 1,787 |
+| `chn_id` | the player scored, so CHN's player id identifies them (this also catches transfers and spelling changes like "Joseph" → "JJ Grainda") | 1,786 |
 | `team_and_name` | same team, same name, another season | 578 |
-| `name_transfer` | history ends on team A in season N, the same name starts on team B in N+1, one-to-one | 112 |
-| `single_season` | no other season to link to | 625 |
+| `name_transfer` | history ends on team A in season N, the same name starts on team B in N+1, one-to-one (both sides of the move are marked) | 177 |
+| `single_season` | no other season to link to | 560 |
 | `ambiguous` | same team and name but two different CHN ids (two real people); left unlinked | 0 |
 
 Result (2025-26 and 2026-27): 65 teams (63 D1) and 2,134 players. 1,384 players have a CHN id
@@ -86,7 +112,7 @@ that's most incoming transfers. Treat these links as very likely, not certain.
 
 ## Keeping IDs stable
 
-The CSVs in `data/processed/ids/` act as a registry. Like all data in this project they are
+The CSVs in `data/processed/ids/` act as a registry, with `player_names.csv` as the lookup. Like all data in this project they are
 gitignored, so keep the folder when moving machines. Each run reads them
 back and keeps every existing id. New teams and players get the next number, so adding a
 season or rescraping never renumbers anyone, which an API's users depend on. If new data shows

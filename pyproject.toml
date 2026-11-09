@@ -5,9 +5,13 @@ description = "CHIRP: College Hockey Intelligence & Reporting Platform (BU oppon
 requires-python = ">=3.11"
 dependencies = [
     "beautifulsoup4>=4.15.0",
+    "fastapi>=0.162.2",
     "lxml>=6.1.1",
     "pandas>=3.0.5",
+    "psycopg[binary,pool]>=3.3.8",
+    "pydantic-settings>=2.16.2",
     "requests>=2.34.2",
+    "uvicorn[standard]>=0.54.0",
 ]
 
 [tool.uv]
@@ -21,6 +25,7 @@ line-length = 100
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.16.0",
     "ipykernel>=7.4.0",
     "matplotlib>=3.11.2",
     "nbconvert>=7.17.2",
