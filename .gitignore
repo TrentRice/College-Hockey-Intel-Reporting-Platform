@@ -16,3 +16,6 @@ data/processed/validation/
 
 # Local secrets (API key, database password)
 .env
+
+# Pipeline run logs (contain data excerpts)
+logs/

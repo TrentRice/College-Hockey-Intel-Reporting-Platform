@@ -1,4 +1,4 @@
-.PHONY: setup lint format test up api-up down logs train serve clean validate ids db-up db-down db-reset load psql
+.PHONY: setup lint format test up api-up down logs refresh runs train serve clean validate ids db-up db-down db-reset load psql
 
 # Install dependencies
 setup:
@@ -18,7 +18,7 @@ format:
 test:
 	uv run pytest -v
 
-# Start the API and Postgres in Docker, in the background (http://127.0.0.1:8000/docs)
+# Start Postgres, the API and the nightly refresh in Docker (http://127.0.0.1:8000/docs)
 up api-up:
 	docker compose up -d --build --wait
 
@@ -62,6 +62,14 @@ load:
 # Open a SQL prompt on the database (tables are in the `hockey` schema)
 psql:
 	docker compose exec -e PGOPTIONS="-c search_path=hockey" db psql -U hockey -d hockey
+
+# Refresh the data now: scrape, download, parse, validate, ids, load (also runs nightly in Docker)
+refresh:
+	uv run python -m src.pipeline.refresh
+
+# Recent refresh runs
+runs:
+	docker compose exec -T db psql -U hockey -d hockey -P pager=off -c "SET timezone = 'America/New_York'; SELECT run_id, started_at::timestamp(0) AS started_eastern, date_trunc('second', finished_at - started_at) AS took, status, trigger, failed_step, played_after - played_before AS new_games FROM ops.pipeline_runs ORDER BY run_id DESC LIMIT 10"
 
 # Build features
 features:

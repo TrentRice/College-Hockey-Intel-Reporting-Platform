@@ -10,9 +10,24 @@ from pydantic import BaseModel, Field
 SEASON_PATTERN = r"^\d{4}-\d{2}$"
 
 
+class RefreshRun(BaseModel):
+    started_at: dt.datetime
+    finished_at: dt.datetime | None
+    status: Literal["running", "success", "failed", "blocked"] = Field(
+        description="blocked = validation stopped the load; the data is from the last success"
+    )
+    trigger: Literal["manual", "scheduled"]
+    failed_step: str | None
+    new_games: int | None = Field(description="Games that became final in this run")
+
+
 class Health(BaseModel):
     status: Literal["ok"]
     database: Literal["ok"]
+    data_as_of: dt.datetime | None = Field(description="When the last successful refresh finished")
+    last_refresh: RefreshRun | None = Field(
+        description="The most recent refresh, whatever its result"
+    )
 
 
 class Season(BaseModel):

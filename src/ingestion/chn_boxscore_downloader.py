@@ -42,7 +42,8 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from src.ingestion.chn_team_schedule_scraper import HEADERS, Season
+from src.ingestion.chn_team_schedule_scraper import Season
+from src.ingestion.http import HEADERS, RobotsDisallowed, check_robots
 
 REQUEST_DELAY = 2.0  # seconds between requests; be polite to a small, ad-supported site
 MAX_ATTEMPTS = 3
@@ -98,6 +99,10 @@ def fetch(url: str) -> tuple[str | None, str | None]:
     """Returns (html, None) on success or (None, error description)."""
     global _last_request
     error = "unknown error"
+    try:
+        check_robots(url)
+    except RobotsDisallowed as e:
+        return None, str(e)
     for attempt in range(1, MAX_ATTEMPTS + 1):
         wait = REQUEST_DELAY - (time.time() - _last_request)
         if wait > 0:

@@ -1,5 +1,5 @@
-# Local stack: Postgres + the CHIRP API. Start with `make api-up` (or `make db-up` for the
-# database alone).
+# Local stack: Postgres, the CHIRP API and the nightly refresh. Start with `make up` (or
+# `make db-up` for the database alone).
 #
 # PRIVATE BY DESIGN. College Hockey News allows personal use only, so every published port
 # is bound to 127.0.0.1: reachable from this machine, refused from any network. Never change
@@ -22,10 +22,11 @@ services:
       interval: 2s
       timeout: 3s
       retries: 15
+    restart: unless-stopped   # comes back with Docker Desktop, before the API and pipeline need it
 
   api:
     build: .
-    image: chirp-api:local
+    image: chirp:local
     container_name: chirp-api
     env_file:
       - path: .env          # API_KEY comes from here at startup; it is never in the image
@@ -39,6 +40,36 @@ services:
       db:
         condition: service_healthy
     # hardening: read-only filesystem, no Linux capabilities, no privilege escalation
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  # Nightly data refresh (src/pipeline/scheduler.py). No ports: it only reaches out to CHN
+  # and to the database. The data stays on this Mac through the bind-mounted folders.
+  pipeline:
+    build: .
+    image: chirp:local
+    container_name: chirp-pipeline
+    command: ["python", "-m", "src.pipeline.scheduler"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TZ: America/New_York  # log timestamps in Eastern
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hockey}:${POSTGRES_PASSWORD:-hockey}@db:5432/${POSTGRES_DB:-hockey}
+    volumes:
+      - ./data:/app/data    # CSVs, raw HTML and the id registry, shared with this Mac
+      - ./logs:/app/logs    # one log (and validation report) per run
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      disable: true         # the image's healthcheck is for the API
     read_only: true
     tmpfs:
       - /tmp

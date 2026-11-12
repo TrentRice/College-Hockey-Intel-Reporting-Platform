@@ -35,7 +35,7 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         pool = make_pool(url)
         try:
-            pool.open(wait=True, timeout=5)
+            pool.open(wait=True, timeout=30)  # Docker may start the API before Postgres is ready
         except PoolTimeout as e:
             raise RuntimeError("Can't reach the database. Is it running? Try `make db-up`.") from e
         app.state.pool = pool

@@ -41,8 +41,9 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
+from src.ingestion.http import HEADERS, check_robots  # noqa: F401  (HEADERS re-exported)
+
 BASE_URL = "https://www.collegehockeynews.com"
-HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; chirp-hockey/0.1; personal research)"}
 
 # Any team's page works for discovering the menu; BU is always present.
 DISCOVERY_TEAM = ("Boston-University", 10)
@@ -351,6 +352,7 @@ def fetch_html(
         age_hours = (time.time() - cache_path.stat().st_mtime) / 3600
         if age_hours < max_age_hours or is_final(html):
             return html
+    check_robots(url)
     wait = REQUEST_DELAY - (time.time() - _last_request)
     if wait > 0:
         time.sleep(wait)
@@ -708,7 +710,10 @@ def scrape_many(
     refresh: bool = False,
     max_age_hours: float = 6.0,
     root: Path = Path("."),
+    strict: bool = False,
 ) -> pd.DataFrame:
+    """strict: if any team fails, keep the existing all_games file and exit 1 rather than
+    writing a table that is missing that team's games."""
     print(f"Season {season.label}: {len(reg.teams)} teams (team list: {reg.source})")
     frames, failures = [], []
     for t in reg.teams:
@@ -717,6 +722,12 @@ def scrape_many(
         except Exception as e:  # keep going; report at the end
             print(f"{t}: FAILED -> {e}")
             failures.append((t, str(e)))
+
+    if strict and failures:
+        print(f"\n{len(failures)} team(s) failed; all_games left unchanged (--strict):")
+        for t, msg in failures:
+            print(f"  {t}: {msg}")
+        raise SystemExit(1)
 
     nonempty = [f for f in frames if len(f)]
     team_games = (
@@ -765,6 +776,11 @@ def main() -> None:
     ap.add_argument("--refresh", action="store_true", help="ignore cached HTML")
     ap.add_argument("--delay", type=float, default=1.5, help="seconds between requests")
     ap.add_argument(
+        "--strict",
+        action="store_true",
+        help="if any team fails, exit 1 and leave all_games unchanged",
+    )
+    ap.add_argument(
         "--max-age-hours",
         type=float,
         default=6.0,
@@ -782,7 +798,7 @@ def main() -> None:
             resolve_team(reg, args.team), season, reg, args.refresh, args.max_age_hours, root
         )
     else:
-        scrape_many(season, reg, args.refresh, args.max_age_hours, root)
+        scrape_many(season, reg, args.refresh, args.max_age_hours, root, strict=args.strict)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,8 @@ import pytest
 def test_health_needs_no_key(client):
     r = client.get("/health", headers={"X-API-Key": ""})
     assert r.status_code == 200
-    assert r.json() == {"status": "ok", "database": "ok"}
+    body = r.json()
+    assert (body["status"], body["database"]) == ("ok", "ok")
 
 
 @pytest.mark.parametrize("headers", [{"X-API-Key": ""}, {"X-API-Key": "wrong"}])

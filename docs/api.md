@@ -42,7 +42,7 @@ latest season.
 
 | Endpoint | Returns |
 |---|---|
-| `GET /health` | API and database status (no key needed) |
+| `GET /health` | API and database status, when the data was last refreshed, and the latest refresh's result (no key needed) |
 | `GET /v1/seasons` | Seasons loaded, with scheduled and played game counts |
 | `GET /v1/teams` | Teams in a season. Filters: `conference`, `search` (also matches old names), `d1_only` |
 | `GET /v1/teams/{team_id}` | One team: name history and conference by season |

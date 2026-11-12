@@ -546,8 +546,7 @@ def approximate_checks(data: dict[str, pd.DataFrame]) -> list[Approx]:
     out.append(
         approx(
             "Power-play goals = goals tagged PP in the scoring summary",
-            "Goal strength tags can be missing; features use the team PP totals, which are "
-            "exact",
+            "Goal strength tags can be missing; features use the team PP totals, which are exact",
             rows["pp_goals"],
             g["pp"].reindex(rows.index, fill_value=0),
             0,
@@ -614,7 +613,12 @@ def status(c: Exact) -> str:
 
 
 def write_report(
-    root: Path, tags: list[str], data: dict, exact: list[Exact], approx: list[Approx]
+    root: Path,
+    tags: list[str],
+    data: dict,
+    exact: list[Exact],
+    approx: list[Approx],
+    report_path: Path = REPORT_PATH,
 ) -> str:
     ag = data["all_games"].set_index("game_id")
     cov = coverage(data)
@@ -742,7 +746,7 @@ def write_report(
         lines += ["None.", ""]
 
     text = "\n".join(lines)
-    path = root / REPORT_PATH
+    path = root / report_path
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     return text
@@ -751,13 +755,19 @@ def write_report(
 def main() -> None:
     ap = argparse.ArgumentParser(description="Validate the processed CHN data and write a report")
     ap.add_argument("--strict", action="store_true", help="exit 1 if anything is unexplained")
+    ap.add_argument(
+        "--report",
+        type=Path,
+        default=REPORT_PATH,
+        help="where to write the Markdown report (the pipeline writes it next to its logs)",
+    )
     args = ap.parse_args()
 
     root = Path(".")
     data, tags = load(root)
     exact = exact_checks(data)
     approx = approximate_checks(data)
-    write_report(root, tags, data, exact, approx)
+    write_report(root, tags, data, exact, approx, report_path=args.report)
 
     failures = pd.concat(
         [c.failures.assign(check=c.name) for c in exact if len(c.failures)], ignore_index=True
@@ -772,7 +782,7 @@ def main() -> None:
     for c in exact:
         print(f"{c.name:<{width}}  {c.checked:>7,} checked  {status(c).replace('**', '')}")
     unexplained = sum(c.unexplained for c in exact)
-    print(f"\nReport: {REPORT_PATH}   Mismatch list: {FAILURES_PATH}")
+    print(f"\nReport: {args.report}   Mismatch list: {FAILURES_PATH}")
     if args.strict and unexplained:
         sys.exit(1)
 

@@ -49,6 +49,9 @@ Every season on disk (2025-26 and 2026-27) is checked by `src/evaluation/validat
 **API (FastAPI)**
 `make up` runs Postgres and a read-only REST API in Docker at http://127.0.0.1:8000, with interactive docs at `/docs`. It covers teams (schedule and results, season stats, roster), games (search by date or team, plus full box scores with every goal and penalty), players (accent- and spelling-insensitive search, profiles, game logs), and skater and goalie leader boards. It is private by design: every port is published to localhost only, the image holds no data or secrets, it needs an API key (`X-API-Key`, set in `.env`), and uses read-only database connections. Tests run against a separate database of made-up rows, in CI as well. See [docs/api.md](docs/api.md).
 
+**Automated refresh**
+During the season the data refreshes itself. A `pipeline` service in Docker runs scrape → download → parse → validate → ids → load once a day after 5 a.m. Eastern, and catches up if the Mac was asleep. Validation acts as a gate: if it fails, the load is skipped and the API keeps the last good data. Every run is recorded (`make runs`) and shown on the API's `/health`. Requests check CHN's robots.txt first. Run it by hand with `make refresh`. See [docs/pipeline.md](docs/pipeline.md).
+
 ### Planned
 
 - **Feature building** (`src/features/`): record, last-5 form, goals for/against, shot differential, special teams, goalie workload, top scorers, point pace
