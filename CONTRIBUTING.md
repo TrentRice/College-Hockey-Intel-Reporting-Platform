@@ -1,54 +1,45 @@
-# Contributing / Dev Setup
+# Working on CHIRP
 
-Notes for working on this project — written for future-you as much as anyone else.
+Notes for future me.
 
 ## First-time setup
 
 ```bash
-git clone <repo-url>
-cd <repo-name>
-cp .env.example .env          # fill in real values
-make setup                    # installs deps + pre-commit hooks
-make up                       # starts API + MLflow + Postgres locally
+git clone <repo-url> && cd <repo>
+cp .env.example .env     # then set API_KEY (see the comment in the file)
+make setup               # installs dependencies; turns on notebook output stripping
+make up                  # Postgres, API, nightly pipeline and dashboard in Docker
 ```
 
-## Day-to-day commands
+The database starts empty. The first `make refresh`, or the first nightly run, scrapes CHN
+and loads it. **The data never goes in git** (College Hockey News: personal use only).
+
+## Day to day
 
 | Command | What it does |
 |---|---|
-| `make lint` | Check code style |
-| `make format` | Auto-fix formatting |
-| `make test` | Run test suite |
-| `make ingest` | Run data ingestion |
-| `make features` | Build features from processed data |
-| `make train MODEL=gbm` | Train a specific model |
-| `make serve` | Run the API locally without Docker |
-| `make down` | Stop the local stack |
+| `make up` / `make down` | Start / stop everything in Docker (data is kept) |
+| `make logs` | Follow the containers' logs |
+| `make refresh` | Run the full data refresh now (normally nightly) |
+| `make runs` | Recent refresh runs and their status |
+| `make predict` | Log win probabilities for the coming week now |
+| `make backup` / `make restore-predictions` | Back up / restore the prediction log |
+| `make dashboard` | Dashboard outside Docker, reloading on save (stop the Docker one first) |
+| `make serve` | API outside Docker, reloading on save |
+| `make psql` | SQL prompt on the database |
+| `make test` | All tests (needs `make db-up`; they use a separate made-up test database) |
+| `make lint` / `make format` | Ruff |
 
-## Branching convention
+## Things that matter
 
-- `main` — always deployable
-- `feature/<short-description>` — new work
-- `fix/<short-description>` — bug fixes
-
-Open a PR into `main`; CI must pass before merging.
-
-## Commit messages
-
-Keep them descriptive and in imperative mood: `Add calibration check to evaluation step`,
-not `fixed stuff`.
-
-## Adding a new dependency
-
-```bash
-uv add <package>              # or: poetry add <package>
-```
-
-Commit the updated `pyproject.toml` (and lockfile) in the same commit as the code that
-needs it.
-
-## Before opening a PR
-
-- [ ] `make lint` and `make test` pass locally
-- [ ] Updated `README.md` if you changed setup steps or architecture
-- [ ] Updated `docs/model_card_template.md`-based model card if you trained/promoted a new model
+- **Notebooks:** analysis and model building live in `notebooks/`, numbered in order. Their
+  outputs are stripped on commit (CHN data). After a fresh clone, `make setup` turns that
+  back on.
+- **The model is frozen.** `models/win_model_v1.json` is v1's card, and v1 never changes. A
+  new model is v2, built by the plan in `docs/eda.md`.
+- **`make db-reset` deletes the database.** It backs up the prediction log first. Then run
+  `make load` and `make restore-predictions`.
+- **New dependency:** add it to the group that needs it (`uv add --group api|pipeline|dashboard
+  <package>`, or `uv add --dev` for notebooks and tests). Shared ones go in the main list.
+  Each Docker image installs only its own group.
+- **Commits:** I commit and push myself. Imperative messages ("Add rankings tab").

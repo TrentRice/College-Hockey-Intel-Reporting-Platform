@@ -97,12 +97,64 @@ tournaments):
 - **Early season:**
   - Teams have no history in their first games, and the warm-up rule skips games until both
     teams have 3 games.
-  - **Next improvement:** a preseason rating carried over from the previous season (for
-    example, Elo regressed toward the mean). It can only be tested once there's a second
-    season to train on.
+  - **Next improvement:** a preseason rating carried over from last season. It's planned as
+    model v2; see the next section.
 - **Neutral sites** are treated as exactly 50/50 home edge. A tournament that's close to
   one team's campus isn't modeled.
 - **Calibration:**
   - The 50–60% bin ran about 8 points under the actual win rate.
   - Predictions over 80% were won 94% of the time (36 games).
   - Recheck on 2026-27 before correcting anything.
+
+## Plan: model v2 (last season carried over)
+
+**The timeline:** build it in summer 2027, after 2026-27 ends, and launch it as v2 for the
+2027-28 season. Until then, v1 stays frozen and keeps logging every game's prediction, so
+v2 has a fixed, honest record to beat.
+
+**What v2 changes:**
+- Each team starts the season with a **preseason rating from last season**, instead of
+  starting from nothing.
+- As the team plays, its own current-season numbers take over and last season fades out.
+- **For each model input** (close-game shot share and goal differential):
+
+  ```
+  input = (games played × this season's value + k × preseason value) / (games played + k)
+  ```
+
+  - **Preseason value:** last season's final number, pulled partway back toward average,
+    because rosters turn over (graduations, transfers, NHL signings).
+  - **k:** how many games' worth of trust the preseason value gets. With k = 6, after 6
+    games this season and last season count equally; after 18 games last season is a quarter
+    of the blend.
+- **Both are measured from the data, not guessed:**
+  - how far to pull back from how well 2025-26 numbers predicted 2026-27's;
+  - k from the best early-season predictions.
+- **Possible refinement:** use the player ids that link seasons to measure how much of last
+  season's scoring returns. A team returning most of its points keeps more of last year's
+  rating.
+
+**What it should fix:**
+- Early-season predictions. The prediction log shows v1 is overconfident in a season's
+  first weeks, when teams have only a few games.
+- The Rankings tab would work from opening night, labeled as preseason, instead of staying
+  empty until teams have 5 games.
+- The 3-game warm-up rule could go.
+- By mid-season the difference should be small.
+
+**Why it has to wait:**
+- **It needs two complete seasons.** Only 2025-26 and 2026-27 are kept, and 2025-26 has no
+  season before it. The carry-over can only be measured from 2025-26 → 2026-27, once 2026-27
+  is finished.
+- **Testing has to stay honest.** 2026-27 is v1's test season. Building v2 on it now would
+  mean tuning on the test data. Instead:
+  - v2 is trained on 2025-26 → 2026-27;
+  - it's tested on 2027-28 games it has never seen, with the prediction log comparing v2
+    against v1 live.
+
+**When building it:** follow the same rules as v1 (see `eda_plan.md` and notebook 09).
+- Choose everything on training data only.
+- Freeze it as `win_model_v2` with its own card.
+- Never overwrite v1.
+- Keep logging v1 alongside v2 for a season, so the comparison is like for like.
+

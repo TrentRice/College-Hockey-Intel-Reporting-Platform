@@ -375,20 +375,23 @@ wheels = [
 name = "chirp-hockey"
 version = "0.1.0"
 source = { virtual = "." }
+default-groups = ["api", "dashboard", "dev", "pipeline"]
 dependencies = [
-    { name = "beautifulsoup4" },
-    { name = "fastapi" },
-    { name = "lxml" },
-    { name = "pandas" },
     { name = "psycopg", extra = ["binary", "pool"] },
     { name = "pydantic-settings" },
-    { name = "requests" },
-    { name = "streamlit" },
     { name = "tzdata" },
-    { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.dev-dependencies]
+api = [
+    { name = "fastapi" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+dashboard = [
+    { name = "pandas" },
+    { name = "requests" },
+    { name = "streamlit" },
+]
 dev = [
     { name = "httpx2" },
     { name = "ipykernel" },
@@ -398,22 +401,30 @@ dev = [
     { name = "pytest" },
     { name = "scikit-learn" },
 ]
+pipeline = [
+    { name = "beautifulsoup4" },
+    { name = "lxml" },
+    { name = "pandas" },
+    { name = "requests" },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "beautifulsoup4", specifier = ">=4.15.0" },
-    { name = "fastapi", specifier = ">=0.162.2" },
-    { name = "lxml", specifier = ">=6.1.1" },
-    { name = "pandas", specifier = ">=3.0.5" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.3.8" },
     { name = "pydantic-settings", specifier = ">=2.16.2" },
-    { name = "requests", specifier = ">=2.34.2" },
-    { name = "streamlit", specifier = ">=1.67.0" },
     { name = "tzdata", specifier = ">=2026.3" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.54.0" },
 ]
 
 [package.metadata.requires-dev]
+api = [
+    { name = "fastapi", specifier = ">=0.162.2" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.54.0" },
+]
+dashboard = [
+    { name = "pandas", specifier = ">=3.0.5" },
+    { name = "requests", specifier = ">=2.34.2" },
+    { name = "streamlit", specifier = ">=1.67.0" },
+]
 dev = [
     { name = "httpx2", specifier = ">=2.16.0" },
     { name = "ipykernel", specifier = ">=7.4.0" },
@@ -422,6 +433,12 @@ dev = [
     { name = "nbstripout", specifier = ">=0.9.1" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "scikit-learn", specifier = ">=1.9.1" },
+]
+pipeline = [
+    { name = "beautifulsoup4", specifier = ">=4.15.0" },
+    { name = "lxml", specifier = ">=6.1.1" },
+    { name = "pandas", specifier = ">=3.0.5" },
+    { name = "requests", specifier = ">=2.34.2" },
 ]
 
 [[package]]

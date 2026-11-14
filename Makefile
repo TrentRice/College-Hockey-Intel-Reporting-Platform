@@ -1,18 +1,19 @@
-.PHONY: setup lint format test up api-up down logs refresh predict runs dashboard train serve clean validate ids db-up db-down db-reset load psql
+.PHONY: setup lint format test up api-up down logs refresh predict backup restore-predictions runs dashboard serve clean validate ids db-up db-down db-reset load psql
 
-# Install dependencies
+# First-time setup: install every dependency group, and strip notebook outputs from git
+# (CHN data must never be committed; nbstripout's filter lives in .git/config, so a fresh
+# clone needs it again)
 setup:
 	uv sync
-	pre-commit install
+	uv run nbstripout --install --attributes .gitattributes
 
-# Run linter
+# Lint and auto-format (ruff runs through uvx; it isn't a project dependency)
 lint:
-	ruff check .
+	uvx ruff check .
 
-# Auto-format code
 format:
-	ruff format .
-	ruff check --fix .
+	uvx ruff format .
+	uvx ruff check --fix .
 
 # Run test suite
 test:
@@ -51,10 +52,14 @@ db-up:
 db-down:
 	docker compose stop db
 
-# Delete the database and its volume, then start it empty
+# Delete the database and its volume, then start it empty. Backs up the prediction log
+# first (it can't be rebuilt from CHN) and stops if that fails; FORCE=1 skips the backup.
+# Afterwards: `make load`, then `make restore-predictions`.
 db-reset:
+	@if [ -z "$(FORCE)" ]; then uv run python -m src.pipeline.backup || { echo "Backup failed, so the database was NOT reset. Fix it, or run 'make db-reset FORCE=1'."; exit 1; }; fi
 	docker compose down -v
 	docker compose up -d --wait db
+	@echo "Database reset. Next: make load, then make restore-predictions"
 
 # Load the processed CSVs + id tables into Postgres (full refresh, one transaction)
 load:
@@ -72,6 +77,15 @@ refresh:
 predict:
 	uv run python -m src.pipeline.predict
 
+# Back up the prediction log to data/backups/ (the nightly refresh does this too)
+backup:
+	uv run python -m src.pipeline.backup
+
+# Add rows from the newest backup (or FILE=data/backups/predictions_YYYY-MM-DD.csv.gz)
+# that aren't in the prediction log; never overwrites
+restore-predictions:
+	uv run python -m src.pipeline.backup --restore $(FILE)
+
 # Recent refresh runs
 runs:
 	docker compose exec -T db psql -U hockey -d hockey -P pager=off -c "SET timezone = 'America/New_York'; SELECT run_id, started_at::timestamp(0) AS started_eastern, date_trunc('second', finished_at - started_at) AS took, status, trigger, failed_step, played_after - played_before AS new_games FROM ops.pipeline_runs ORDER BY run_id DESC LIMIT 10"
@@ -85,9 +99,6 @@ dashboard:
 features:
 	python -m src.features.build_features
 
-# Train a model (usage: make train MODEL=gbm)
-train:
-	python -m src.models.train --model $(MODEL)
 
 # Run the API at http://127.0.0.1:8000 (docs at /docs). Localhost only: CHN data stays private
 serve:

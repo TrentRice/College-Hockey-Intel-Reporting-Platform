@@ -3,21 +3,17 @@ name = "chirp-hockey"
 version = "0.1.0"
 description = "CHIRP: College Hockey Intelligence & Reporting Platform (BU opponent scouting)"
 requires-python = ">=3.11"
+# Shared by every part. Each service adds its own group below; its Docker image installs
+# only that (see Dockerfile). Locally `uv sync` installs every group (default-groups).
 dependencies = [
-    "beautifulsoup4>=4.15.0",
-    "fastapi>=0.162.2",
-    "lxml>=6.1.1",
-    "pandas>=3.0.5",
     "psycopg[binary,pool]>=3.3.8",
     "pydantic-settings>=2.16.2",
-    "requests>=2.34.2",
-    "streamlit>=1.67.0",
     "tzdata>=2026.3",
-    "uvicorn[standard]>=0.54.0",
 ]
 
 [tool.uv]
 package = false
+default-groups = ["dev", "api", "pipeline", "dashboard"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -26,6 +22,21 @@ pythonpath = ["."]
 line-length = 100
 
 [dependency-groups]
+api = [
+    "fastapi>=0.162.2",
+    "uvicorn[standard]>=0.54.0",
+]
+pipeline = [  # scraping, validation, ids, the loader
+    "beautifulsoup4>=4.15.0",
+    "lxml>=6.1.1",
+    "pandas>=3.0.5",
+    "requests>=2.34.2",
+]
+dashboard = [
+    "pandas>=3.0.5",
+    "requests>=2.34.2",
+    "streamlit>=1.67.0",
+]
 dev = [
     "httpx2>=2.16.0",
     "ipykernel>=7.4.0",

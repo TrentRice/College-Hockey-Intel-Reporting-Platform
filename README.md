@@ -1,78 +1,124 @@
 # CHIRP
 
-**College Hockey Intelligence & Reporting Platform**: a database of D-I men's college hockey games, box scores and players, built for scouting and modeling. Its first use is the BU Hockey Opponent Scouting Tool below.
+**College Hockey Intelligence & Reporting Platform.** A private, self-updating platform for
+D-I men's college hockey. It has a database of every game, box score and player, an API, a
+scouting dashboard, and a win-probability model that's tested against real results. It was
+built for scouting Boston University's opponents.
 
-## Project Status
+[![CI](https://github.com/TrentRice/College-Hockey-Intel-Reporting-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/TrentRice/College-Hockey-Intel-Reporting-Platform/actions/workflows/ci.yml)
 
-[![CI](https://github.com/TrentRice/College-Hockey-Intel-Reporting-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/TrentRice/College-Hockey-Intel-Reporting-Platform/actions/workflows/ci.yml) [Data validation report](docs/data_validation.md)
+## What it does
 
-**BU Hockey Opponent Scouting Tool** automates the repetitive statistical groundwork behind pre-game opponent scouting reports for Boston University Men's Hockey, using only public data. The end goal is a short pre-game report for BU's next opponent covering schedule and results, recent form, special teams, top scorers, goalie usage, and eventually model-based predictions.
+The dashboard at http://127.0.0.1:8501 has six tabs:
 
-### Completed
+| Tab | What it shows |
+|---|---|
+| **Team** | The scouted team over its last N games next to its season: 20 stats, colored better or worse, and actual vs. expected goal differential by game |
+| **Players** | Skaters and goalies over the same games, with season numbers alongside, and the likely starting goalie |
+| **vs your team** | Both teams side by side on every stat, and this season's meetings |
+| **Win probability** | Your team's chance against the next opponent, or any team at a venue you pick, with what drives it |
+| **Rankings** | A model "poll": the top 20 by chance to beat an average team on neutral ice, with movement since last week |
+| **Model record** | Every prediction, logged before the game and checked against the result: accuracy, log loss, calibration |
 
-**League-wide schedule/results scraper (College Hockey News)**
-Scouting an opponent requires that opponent's full season. `chn_team_schedule_scraper.py` collects schedules and results for all 63 Division I teams:
+It defaults to BU and its next opponent. The sidebar picks your team, the team to scout, a
+cut-off date ("only games before"), and how many recent games to look at.
 
-- Raw HTML is cached in `data/raw/chn/schedules/` (not committed), so re-runs don't re-download
-- Outputs `data/processed/chn/all_games_<season>.csv`, one row per game with home and away team; filter on `home_team`/`away_team` for one team's season
-- Fields include date, result, score, home/away/neutral, opponent, overtime, exhibition, conference flags, event notes (Beanpot, tournaments), and box score / metrics URLs
-- Includes team and opponent conference, so same-league games can be identified
+## Quick start
 
-**Box score ingestion (College Hockey News)**
-Two steps, run after the schedule scraper:
-
-- `chn_boxscore_downloader.py` saves each played game's box score page to `data/raw/chn/boxscores/<season>/` (incremental, so in-season re-runs only fetch new games)
-- `chn_boxscore_parser.py` turns those pages into `data/processed/chn/box_*_<season>.csv`:
-  - `box_games`: venue, attendance, officials, OT periods, shootout result (score and game flags are in `all_games`)
-  - `box_team_stats`: goals/shots by period, PP/PK, PIM, faceoffs, xG, empty-net time (one row per team per game)
-  - `box_skaters`: G, A, +/-, shots, TOI, PIM, faceoffs, F/D position
-  - `box_goalies`: saves, GA, TOI, starter flag
-  - `box_goals`: period, time, strength (EV/PP/SH/EN/EA/4x4), scorer, assists
-  - `box_penalties`: period, time, player, minutes, infraction
-- The parser checks that goals, GA, and penalty counts agree across sections and with the schedule; mismatches go to `box_parse_issues_<season>.csv`
-
-```
-uv run python -m src.ingestion.chn_team_schedule_scraper
-uv run python -m src.ingestion.chn_boxscore_downloader
-uv run python -m src.ingestion.chn_boxscore_parser
+```bash
+cp .env.example .env     # set API_KEY
+make setup               # dependencies, plus notebook output stripping
+make up                  # Postgres, API, nightly pipeline, dashboard (Docker)
+make refresh             # first load: scrape College Hockey News and fill the database
 ```
 
-**Data validation**
-Every season on disk (2025-26 and 2026-27) is checked by `src/evaluation/validate_chn_data.py`, which writes [docs/data_validation.md](docs/data_validation.md). It cross-checks each box score against the separate schedule pages (final score, overtime) and checks that the sections of each box score agree (period totals, scoring summary, skater goals, penalties, goalies, faceoffs). Every remaining mismatch is an error on the source page, listed in the report with a link to it. The data is gitignored, so run the checks locally with `make validate`.
+Then open http://127.0.0.1:8501 (dashboard) or http://127.0.0.1:8000/docs (API). After the
+first load, the data refreshes itself every morning. Day-to-day commands are in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-**Database schema and stable IDs**
-[db/schema.sql](db/schema.sql) is a PostgreSQL star schema: dimension tables (teams, players, seasons, conferences) and fact tables (games, team/skater/goalie game stats, goals, penalties), plus season-total views. Box scores name players with plain text, so `src/transform/id_mapping.py` assigns every team and player a stable id. It links seasons by CHN player id, then by team and name, and catches transfers who haven't scored yet. The ids are written to `data/processed/ids/`, and each run reuses the ids from the last one. Details, including what CHN's terms allow, are in [docs/schema.md](docs/schema.md). Rebuild with `make ids`.
+## How it works
 
-**PostgreSQL database**
-`make db-up` starts Postgres 17 in Docker, and `make load` loads both seasons into it: about 85k rows in about a second, as a full refresh in one transaction. The loader refuses any name it can't map to an id, and checks row counts and season totals before committing. Query the data with `make psql`, or connect any SQL client to `localhost:5432` (user, password and database are all `hockey`). See [docs/schema.md](docs/schema.md#loading-the-database).
-
-**API (FastAPI)**
-`make up` runs Postgres and a read-only REST API in Docker at http://127.0.0.1:8000, with interactive docs at `/docs`. It covers teams (schedule and results, season stats, roster), games (search by date or team, plus full box scores with every goal and penalty), players (accent- and spelling-insensitive search, profiles, game logs), and skater and goalie leader boards. It is private by design: every port is published to localhost only, the image holds no data or secrets, it needs an API key (`X-API-Key`, set in `.env`), and uses read-only database connections. Tests run against a separate database of made-up rows, in CI as well. See [docs/api.md](docs/api.md).
-
-**Automated refresh**
-During the season the data refreshes itself. A `pipeline` service in Docker runs scrape → download → parse → validate → ids → load once a day after 5 a.m. Eastern, and catches up if the Mac was asleep. Validation acts as a gate: if it fails, the load is skipped and the API keeps the last good data. Every run is recorded (`make runs`) and shown on the API's `/health`. Requests check CHN's robots.txt first. Run it by hand with `make refresh`. See [docs/pipeline.md](docs/pipeline.md).
-
-**Form features**
-Team and player form over the last N games, with the season so far alongside for comparison. Any N works, up to the games played. Team form covers record, streak, scoring, shot share, xG, special teams and faceoffs; player form covers points, PP production, shooting, goalie save % and the likely starter. An `as_of` date limits the numbers to earlier games, and a test checks nothing leaks in from later games. Served by `/v1/teams/{id}/form` and `/player-form`. See [docs/features.md](docs/features.md).
-
-**Scouting dashboard**
-`make up`, then http://127.0.0.1:8501. A Streamlit app that defaults to BU's next opponent, with a **last N games** slider (1 up to the games they've played) and the season so far alongside every number. Tabs: Team (headline numbers with their change, a 20-stat comparison, an actual-vs-expected (xG) goal differential chart by game), Players (skaters and goalies, likely starter), and a head-to-head against BU. It reads only from the API, runs on localhost only, and has Streamlit's usage statistics turned off. See [docs/dashboard.md](docs/dashboard.md).
-
-### Planned
-
-- **Report generation** (`src/reports/`): HTML or PDF opponent report for BU's next game
-- **Modeling** (`src/models/`): game outcome predictions for each BU game
-
-### Data
-
-The data comes from College Hockey News and isn't in this repo: CHN's terms allow personal, non-commercial use only (see [docs/schema.md](docs/schema.md#data-source-and-use)). Rebuild it locally with the scrapers above, then `make validate`, `make ids`, `make db-up` and `make load`.
-
-### Tech Stack
-Python, requests, BeautifulSoup (lxml), pandas, PostgreSQL 17, FastAPI, Streamlit + Altair, Docker Compose, psycopg, managed with uv.
-
-### Project Structure
 ```
-data/{raw,interim,processed}/
-db/schema.sql
-src/{ingestion,transform,db,api,pipeline,features,dashboard,evaluation,models}/
+College Hockey News ─► scrape ─► parse ─► validate ─► ids ─► load ─► predict ─► backup   (nightly)
+                                                              │
+                                     Postgres ◄────────────────┘
+                                        │ read-only
+                                     CHIRP API (key required) ─► Dashboard
+```
+
+- **Data:**
+  - Scrapers collect every D-I team's schedule and every box score: goals, shots by period,
+    special teams, skaters, goalies, goals and penalties.
+  - A validation gate cross-checks them. If the numbers don't add up, the load is skipped
+    and the last good data keeps serving.
+  - Stable ids follow players across seasons, spelling changes and transfers.
+- **Database:** PostgreSQL 17, loaded as a full refresh in one transaction.
+- **API:** FastAPI with read-only connections and an API key. It covers teams, games, box
+  scores, players, leaders, form, win probabilities, rankings and the prediction log.
+- **Nightly pipeline:**
+  - Runs after 5 a.m. Eastern and catches up if the Mac was asleep. Every run is recorded.
+  - Logs each game's win probability before the game and locks it on game day.
+  - Backs up the prediction log.
+- **Docker:** three small images from one Dockerfile (api, pipeline, dashboard), each with
+  only its own dependencies.
+
+Details: [architecture](docs/architecture.md) · [database](docs/schema.md) ·
+[pipeline](docs/pipeline.md) · [API](docs/api.md) · [dashboard](docs/dashboard.md) ·
+[form features](docs/features.md) · [data validation](docs/data_validation.md)
+
+## The win model
+
+**Home win probability = logistic(close-game shot share + goal differential + home ice),**
+each team's season so far, home minus away.
+- **Neutral sites get no home edge.**
+- **Ties are left out:** it's the chance of winning a decided game.
+
+**How it was chosen:** an EDA in eight notebooks (`notebooks/01`–`08`, written up in
+[docs/eda.md](docs/eda.md)), with rules fixed before each step and features chosen on
+time-ordered folds of 2025-26.
+- **What predicts:** shot share does most of the work, and goal differential adds a little.
+- **What doesn't help:** recent form, special teams, save %, rest and back-to-backs added
+  nothing on top.
+
+**How it was tested:** it was frozen (`notebooks/09`), then tested on 2026-27 games it had
+never seen. Through Nov 13 that's 173 games: **log loss 0.643 vs 0.680 for the home win
+rate, AUC 0.67, 64% of winners picked.** The live record is on the Model record tab.
+
+**Limits:** it's weak in a season's first weeks, it isn't adjusted for strength of schedule,
+and it knows nothing about players. Full card: [docs/model.md](docs/model.md).
+
+**Next:** v2 carries last season over, so early-season predictions and rankings work from
+opening night. It's planned for 2027-28, once 2026-27 is complete (plan in
+[docs/eda.md](docs/eda.md)).
+
+## Data and privacy
+
+The data comes from [College Hockey News](https://www.collegehockeynews.com), whose terms
+allow **personal, non-commercial use only**. So:
+- **None of it is in this repo:** scraped pages, CSVs, backups, logs and notebook outputs are
+  all gitignored or stripped.
+- **Everything runs on one machine:** every port is bound to 127.0.0.1, the API needs a key,
+  and the scrapers respect robots.txt.
+- **Only 2025-26 onward is kept** (see [docs/schema.md](docs/schema.md#data-source-and-use)).
+
+## Tech stack
+
+Python 3.12, uv · requests, BeautifulSoup/lxml, pandas · PostgreSQL 17, psycopg ·
+FastAPI · Streamlit + Altair · scikit-learn and Jupyter (model building) · Docker Compose ·
+GitHub Actions (tests).
+
+## Project structure
+
+```
+src/
+  ingestion/   scrapers and box score parser        evaluation/  data validation
+  transform/   stable team and player ids           db/          loader
+  features/    form over the last N games           models/      live win model code
+  api/         FastAPI app                          dashboard/   Streamlit app
+  pipeline/    nightly refresh, prediction log, backups
+db/            schema, feature views, prediction log
+notebooks/     EDA (01-08) and the frozen model (09)
+models/        model cards (the fitted .joblib files stay local)
+docs/          design and how-to docs
+tests/         unit, API, pipeline and dashboard tests (made-up data only)
 ```

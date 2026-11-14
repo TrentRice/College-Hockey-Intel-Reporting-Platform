@@ -1,5 +1,6 @@
-# Local stack: Postgres, the CHIRP API, the nightly refresh and the scouting dashboard. Start with `make up` (or
-# `make db-up` for the database alone).
+# Local stack: Postgres, the CHIRP API, the nightly refresh and the scouting dashboard.
+# Start with `make up` (or `make db-up` for the database alone). Each service has its own
+# image, built from one Dockerfile (targets api, pipeline, dashboard).
 #
 # PRIVATE BY DESIGN. College Hockey News allows personal use only, so every published port
 # is bound to 127.0.0.1: reachable from this machine, refused from any network. Never change
@@ -25,8 +26,8 @@ services:
     restart: unless-stopped   # comes back with Docker Desktop, before the API and pipeline need it
 
   api:
-    build: .
-    image: chirp:local
+    build: { context: ., target: api }
+    image: chirp-api:local
     container_name: chirp-api
     env_file:
       - path: .env          # API_KEY comes from here at startup; it is never in the image
@@ -52,10 +53,9 @@ services:
   # Nightly data refresh (src/pipeline/scheduler.py). No ports: it only reaches out to CHN
   # and to the database. The data stays on this Mac through the bind-mounted folders.
   pipeline:
-    build: .
-    image: chirp:local
+    build: { context: ., target: pipeline }
+    image: chirp-pipeline:local
     container_name: chirp-pipeline
-    command: ["python", "-m", "src.pipeline.scheduler"]
     env_file:
       - path: .env
         required: false
@@ -68,8 +68,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    healthcheck:
-      disable: true         # the image's healthcheck is for the API
     read_only: true
     tmpfs:
       - /tmp
@@ -81,10 +79,9 @@ services:
 
   # Scouting dashboard (Streamlit). Reads only from the API, never the database.
   dashboard:
-    build: .
-    image: chirp:local
+    build: { context: ., target: dashboard }
+    image: chirp-dashboard:local
     container_name: chirp-dashboard
-    command: ["python", "-m", "streamlit", "run", "src/dashboard/app.py"]
     env_file:
       - path: .env          # API_KEY, to call the API
         required: false
@@ -98,11 +95,6 @@ services:
     depends_on:
       api:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=2)"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
     read_only: true
     tmpfs:
       - /tmp

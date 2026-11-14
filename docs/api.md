@@ -7,9 +7,9 @@ FastAPI. Code: [src/api/](../src/api/).
 
 **In Docker (normal use):**
 ```
-make up        # builds the API image, starts Postgres + API, waits until healthy
+make up        # builds the images, starts Postgres, the API, the pipeline and the dashboard
 make logs      # follow the logs
-make down      # stop both (the data stays in the pgdata volume)
+make down      # stop everything (the data stays in the pgdata volume)
 ```
 The API container restarts on its own whenever Docker Desktop is running. After changing API
 code, run `make up` again to rebuild.

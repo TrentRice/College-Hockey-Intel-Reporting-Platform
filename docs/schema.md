@@ -58,6 +58,8 @@ one row per game per model version.
   and it has no foreign keys into `hockey`. Game and team ids are stable across loads.
 - **Results aren't stored.** Readers join `hockey.games`, so a corrected score is picked up.
 - **Writer:** `src/pipeline/predict.py` (nightly, see [pipeline.md](pipeline.md)).
+- **Backups:** backed up nightly to `data/backups/` (gitignored), because it can't be
+  rebuilt. Restore with `make restore-predictions`.
 
 ## Loading the database
 

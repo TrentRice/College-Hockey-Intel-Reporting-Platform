@@ -77,6 +77,8 @@ def default_steps(report_path: Path) -> list[Step]:
         Step("load", [*py, "src.db.load"]),
         # after the load: log win probabilities for the coming week (db/predictions.sql)
         Step("predict", [*py, "src.pipeline.predict"]),
+        # the prediction log can't be rebuilt from CHN: keep a copy in data/backups/
+        Step("backup", [*py, "src.pipeline.backup"]),
     ]
 
 

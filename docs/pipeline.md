@@ -4,8 +4,8 @@ Keeps the database current during the season with no manual steps. Code:
 [src/pipeline/](../src/pipeline/).
 
 ```
-schedules ─► box scores ─► parse ─► validate ─► ids ─► load ─► predict
- (scrape)    (new only)            (gate)              (one transaction) (log the week)
+schedules ─► box scores ─► parse ─► validate ─► ids ─► load ─► predict ─► backup
+ (scrape)    (new only)            (gate)              (one transaction) (log the week) (prediction log)
 ```
 
 | Step | Runs | Notes |
@@ -17,6 +17,7 @@ schedules ─► box scores ─► parse ─► validate ─► ids ─► load 
 | ids | `id_mapping` | Reuses existing ids |
 | load | `src.db.load` | Full refresh in one transaction |
 | predict | `src.pipeline.predict` | Logs win model v1's chance for every D-I game in the next 7 days, in `predictions.game_predictions`. Each night updates a game's prediction until game day; the game-day run locks it. Played games not yet logged are backfilled and marked so. Also `make predict` |
+| backup | `src.pipeline.backup` | Copies the prediction log to `data/backups/predictions_<date>.csv.gz` and keeps the newest 30. Also `make backup` |
 
 ## Running it
 
@@ -49,6 +50,11 @@ run's status.
 | `failed` | A step broke: a network problem, CHN down, or a bug | Read `logs/refresh/<run>.log`. It retries in an hour. |
 
 ## Safety
+- **The prediction log is backed up nightly.** It's the one thing in the database that can't
+  be rebuilt from CHN. `make db-reset` backs it up first and stops if that fails
+  (`FORCE=1` skips the backup). After a reset, run `make load`, then
+  `make restore-predictions`, which adds rows from the newest backup and never overwrites
+  existing ones.
 
 - **One run at a time.** A Postgres advisory lock is held for the whole run, so a manual
   `make refresh` can't overlap the scheduled one.
