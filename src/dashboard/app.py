@@ -67,7 +67,7 @@ PALETTE = {
     },
 }
 
-st.set_page_config(page_title="CHIRP Scouting", page_icon="🏒", layout="wide")
+st.set_page_config(page_title="CHIRP: College Hockey Intelligence & Reporting Platform", page_icon="🏒", layout="wide")
 
 
 # ----------------------------------------------------------------------------
@@ -584,15 +584,59 @@ def render_rankings() -> None:
     )
 
 
+
+def render_acknowledgments() -> None:
+    """Credit for the data, and the terms it's used under."""
+    st.subheader("Data from College Hockey News")
+    st.markdown(
+        "Every game, box score and player in CHIRP comes from "
+        "**[College Hockey News](https://www.collegehockeynews.com)**. Thank you to CHN for "
+        "keeping such complete, carefully kept records of D-I men's college hockey, free "
+        "for fans to read. This project wouldn't exist without them."
+    )
+    st.markdown(
+        """
+**What comes from CHN**
+- Schedules and results for every D-I team.
+- Box scores: goals and shots by period, special teams, skater and goalie lines, every goal
+  and penalty.
+- CHN's expected goals (xG), shown in the Team tab's chart. The win model doesn't use them.
+
+**What's CHIRP's own work:** the stable player and team ids, the form numbers, the win model,
+its probabilities and rankings, and the prediction log. Any errors in those are mine, not
+CHN's.
+
+**How the data is used**
+- **Personal, non-commercial use only,** as CHN's terms allow. CHIRP is a private scouting
+  tool: it runs on one computer, isn't published, and isn't shared.
+- **No redistribution.** None of the data is in the project's code repository, and the
+  data, API and site stay private.
+- **Polite collection.** CHN's robots.txt is respected, pages are saved so they're fetched
+  only once, and the refresh runs once a day.
+- **Only the 2025-26 season onward is kept.**
+
+CHIRP is an independent personal project. It is **not affiliated with or endorsed by
+College Hockey News**. All CHN data and content remain theirs.
+"""
+    )
+
+
 # ----------------------------------------------------------------------------
 # Header and tabs
 # ----------------------------------------------------------------------------
 
-st.title(scouted["name"])
-header_caption = st.empty()
-tab_team, tab_players, tab_h2h, tab_win, tab_rank, tab_record = st.tabs(
-    ["Team", "Players", f"vs {home_name}", "Win probability", "Rankings", "Model record"]
+st.markdown(
+    "**CHIRP** · College Hockey Intelligence & Reporting Platform",
+    help="Scouting, win probabilities and rankings for D-I men's college hockey.",
 )
+st.title(f"{home_name} vs {scouted['name']}")
+header_caption = st.empty()
+tab_team, tab_players, tab_h2h, tab_win, tab_rank, tab_record, tab_thanks = st.tabs(
+    ["Team", "Players", f"vs {home_name}", "Win probability", "Rankings", "Model record",
+     "Acknowledgments"]
+)
+with tab_thanks:
+    render_acknowledgments()
 with tab_win:
     render_win_probability()
 with tab_rank:
@@ -615,7 +659,9 @@ if season_totals:
     subtitle.append(f"{season_totals['record']} season")
 if window.get("streak"):
     subtitle.append(f"streak {window['streak']}")
-header_caption.caption(" · ".join(subtitle) + f" · {games_played} games before {as_of:%b %-d}")
+header_caption.caption(
+    f"{scouted['name']}: " + " · ".join(subtitle) + f" · {games_played} games before {as_of:%b %-d}"
+)
 
 # ----------------------------------------------------------------------------
 # Team

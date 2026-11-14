@@ -111,6 +111,13 @@ save. Stop the Docker one first (`docker compose stop dashboard`), because both 
 - **Where the numbers come from:** the nightly refresh logs each game's chance and locks it on
   game day (see [pipeline.md](pipeline.md)).
 
+**Acknowledgments tab**
+- **The credit:** thanks College Hockey News as the source of all the data, and lists what
+  comes from CHN and what's CHIRP's own work.
+- **The terms:** personal, non-commercial use only, no redistribution, robots.txt
+  respected.
+- **The disclaimer:** CHIRP isn't affiliated with or endorsed by CHN.
+
 **Sorting.** Click a column header to sort, and click again to reverse. The difference
 columns hold real numbers, so ascending puts the biggest drop first and descending the biggest
 gain first. In the team table the rows mix units (percentage points and per-game numbers), so

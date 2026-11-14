@@ -43,7 +43,7 @@ def test_next_opponent_that_has_no_games_yet(app):
 def test_scouting_any_team(app):
     app.sidebar.radio[0].set_value("Any team").run()
     no_errors(app)
-    assert app.title[0].value == "Rival College"
+    assert app.title[0].value == "Home U vs Rival College"  # your team first
     slider = app.slider[0]
     assert (slider.min, slider.max, slider.value) == (1, 2, 2)  # Rival College has played 2
 
@@ -158,3 +158,10 @@ def test_rankings_tab(app, monkeypatch):
     ranked = next(f for f in frames if "Beats avg team" in getattr(f, "columns", []))
     data = getattr(ranked, "data", ranked)
     assert list(data["Team"]) == ["Home U", "Rival College"]
+
+
+def test_acknowledgments_tab(app):
+    # Shown even when the scouting tabs can't load (Home U's next opponent has no games)
+    no_errors(app)
+    text = " ".join(m.value for m in app.markdown)
+    assert "College Hockey News" in text and "not affiliated" in text
