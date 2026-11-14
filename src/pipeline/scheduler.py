@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 import psycopg
 
 from config.settings import settings
-from src.pipeline.refresh import OPS_SQL, refresh
+from src.pipeline.refresh import OPS_SQL, clear_stale_runs, refresh
 
 log = logging.getLogger("chirp.scheduler")
 
@@ -68,6 +68,8 @@ def tick() -> None:
     try:
         with psycopg.connect(settings.database_url, autocommit=True, connect_timeout=5) as conn:
             conn.execute(OPS_SQL)
+            if stale := clear_stale_runs(conn):
+                log.warning("marked %d interrupted run(s) as failed", stale)
             run, reason = should_run(now, runs_today(conn, now))
     except psycopg.OperationalError as e:
         log.warning("database not reachable (%s); will check again", e)

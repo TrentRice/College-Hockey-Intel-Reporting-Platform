@@ -1,4 +1,4 @@
-# Local stack: Postgres, the CHIRP API and the nightly refresh. Start with `make up` (or
+# Local stack: Postgres, the CHIRP API, the nightly refresh and the scouting dashboard. Start with `make up` (or
 # `make db-up` for the database alone).
 #
 # PRIVATE BY DESIGN. College Hockey News allows personal use only, so every published port
@@ -70,6 +70,39 @@ services:
         condition: service_healthy
     healthcheck:
       disable: true         # the image's healthcheck is for the API
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  # Scouting dashboard (Streamlit). Reads only from the API, never the database.
+  dashboard:
+    build: .
+    image: chirp:local
+    container_name: chirp-dashboard
+    command: ["python", "-m", "streamlit", "run", "src/dashboard/app.py"]
+    env_file:
+      - path: .env          # API_KEY, to call the API
+        required: false
+    environment:
+      CHIRP_API_URL: http://api:8000
+      STREAMLIT_SERVER_ADDRESS: 0.0.0.0   # inside the container only; see the port below
+      HOME: /tmp                         # Streamlit writes small files under $HOME
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"   # no usage data to Streamlit (also in .streamlit/config.toml)
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-8501}:8501"   # this machine only
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
     read_only: true
     tmpfs:
       - /tmp

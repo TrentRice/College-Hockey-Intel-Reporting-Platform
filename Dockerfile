@@ -20,6 +20,7 @@ RUN uv sync --locked --no-dev --no-install-project
 COPY config ./config
 COPY src ./src
 COPY db ./db
+COPY .streamlit ./.streamlit
 
 # never run as root
 RUN useradd --system --uid 10001 chirp

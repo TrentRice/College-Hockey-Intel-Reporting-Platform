@@ -22,7 +22,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import pandas as pd
@@ -34,6 +36,7 @@ from src.transform.id_mapping import DATA_DIR, NOT_PLAYERS, OUT_DIR, UNKNOWN_SCO
 log = logging.getLogger(__name__)
 
 SCHEMA_SQL = Path("db/schema.sql")
+FEATURES_SQL = Path("db/features.sql")  # views over the tables, rebuilt with them
 SCHEMA = "hockey"
 BENCH = "BENCH"
 
@@ -271,6 +274,7 @@ def load_database(database_url: str, tables: dict[str, pd.DataFrame]) -> dict[st
         conn.execute(f"SET search_path TO {SCHEMA}")
         for table, df in tables.items():
             counts[table] = copy_table(conn, table, df)
+        conn.execute(FEATURES_SQL.read_text())
         check_load(conn, tables)
     return counts
 
@@ -297,6 +301,26 @@ def check_load(conn: psycopg.Connection, tables: dict[str, pd.DataFrame]) -> Non
         raise RuntimeError("load check failed:\n  " + "\n  ".join(problems))
 
 
+@contextmanager
+def refresh_guard(database_url: str):
+    """A load run by hand takes the refresh pipeline's lock, so it can't overlap a refresh.
+    Inside the pipeline the lock is already held by the refresh itself."""
+    from src.pipeline.refresh import IN_PIPELINE_ENV, LOCK_ID
+
+    if os.environ.get(IN_PIPELINE_ENV):
+        yield
+        return
+    with psycopg.connect(database_url, autocommit=True) as conn:
+        if not conn.execute("SELECT pg_try_advisory_lock(%s)", (LOCK_ID,)).fetchone()[0]:
+            raise SystemExit(
+                "A data refresh is running (see `make runs`); try again when it's done."
+            )
+        try:
+            yield
+        finally:
+            conn.execute("SELECT pg_advisory_unlock(%s)", (LOCK_ID,))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--database-url", default=settings.database_url)
@@ -308,7 +332,8 @@ def main() -> None:
     start = time.perf_counter()
     tables = build_tables(args.data_dir, args.ids_dir)
     try:
-        counts = load_database(args.database_url, tables)
+        with refresh_guard(args.database_url):
+            counts = load_database(args.database_url, tables)
     except psycopg.OperationalError as e:
         raise SystemExit(f"Can't connect to the database ({e}). Is it running? Try `make db-up`.")
     for table, n in counts.items():

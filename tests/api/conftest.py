@@ -20,6 +20,7 @@ TEST_DATABASE_URL = os.environ.get(
 )
 API_KEY = "test-key"
 SCHEMA_SQL = Path("db/schema.sql")
+FEATURES_SQL = Path("db/features.sql")
 FIXTURE_SQL = Path(__file__).with_name("fixture.sql")
 
 
@@ -43,8 +44,10 @@ def database_url() -> str:
     ensure_database(TEST_DATABASE_URL)
     with psycopg.connect(TEST_DATABASE_URL) as conn:
         conn.execute("DROP SCHEMA IF EXISTS hockey CASCADE")
+        conn.execute("DROP SCHEMA IF EXISTS features CASCADE")
         conn.execute(SCHEMA_SQL.read_text())
         conn.execute(FIXTURE_SQL.read_text())
+        conn.execute(FEATURES_SQL.read_text())
     return TEST_DATABASE_URL
 
 

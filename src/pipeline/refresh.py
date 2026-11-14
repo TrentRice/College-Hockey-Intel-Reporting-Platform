@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
 import subprocess
 import sys
 import time
@@ -33,6 +34,7 @@ from config.settings import settings
 LOG_DIR = Path("logs/refresh")
 KEEP_LOGS = 60
 LOCK_ID = 7_310_001  # arbitrary, unique to this pipeline
+IN_PIPELINE_ENV = "CHIRP_IN_PIPELINE"  # set for the steps, so `src.db.load` knows the lock is ours
 STEP_TIMEOUT = 45 * 60  # seconds
 
 OPS_SQL = """
@@ -92,7 +94,12 @@ def run_steps(steps: list[Step], log, timeout: float = STEP_TIMEOUT) -> Outcome:
         start = time.monotonic()
         try:
             code = subprocess.run(
-                step.args, stdout=log, stderr=subprocess.STDOUT, timeout=timeout, check=False
+                step.args,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                timeout=timeout,
+                check=False,
+                env={**os.environ, IN_PIPELINE_ENV: "1"},
             ).returncode
         except subprocess.TimeoutExpired:
             log.write(f"\n{step.name} timed out after {timeout:.0f}s\n")
@@ -118,6 +125,27 @@ def prune_logs(log_dir: Path, keep: int = KEEP_LOGS) -> None:
         old.with_suffix(".validation.md").unlink(missing_ok=True)
 
 
+def mark_interrupted(conn: psycopg.Connection) -> int:
+    """Runs left 'running' by a process that died (container rebuilt, Mac shut down). Only
+    call while holding the lock: then nothing else can really be running."""
+    cur = conn.execute(
+        "UPDATE ops.pipeline_runs SET status = 'failed', failed_step = 'interrupted', "
+        "finished_at = now(), message = 'process stopped before the run finished' "
+        "WHERE status = 'running'"
+    )
+    return cur.rowcount
+
+
+def clear_stale_runs(conn: psycopg.Connection) -> int:
+    """If no refresh holds the lock, any 'running' row is an orphan: mark it failed."""
+    if not conn.execute("SELECT pg_try_advisory_lock(%s)", (LOCK_ID,)).fetchone()[0]:
+        return 0  # a refresh really is running
+    try:
+        return mark_interrupted(conn)
+    finally:
+        conn.execute("SELECT pg_advisory_unlock(%s)", (LOCK_ID,))
+
+
 def refresh(
     trigger: str = "manual", database_url: str | None = None, steps: list[Step] | None = None
 ) -> Outcome:
@@ -134,6 +162,8 @@ def refresh(
         if not lock_conn.execute("SELECT pg_try_advisory_lock(%s)", (LOCK_ID,)).fetchone()[0]:
             print("Another refresh is running; not starting a second one.")
             return Outcome("failed", "lock")
+        if stale := mark_interrupted(lock_conn):
+            print(f"Marked {stale} interrupted earlier run(s) as failed.")
         before = played_games(lock_conn)
         (run_id,) = lock_conn.execute(
             "INSERT INTO ops.pipeline_runs (status, trigger, played_before, log_file) "

@@ -1,4 +1,4 @@
-.PHONY: setup lint format test up api-up down logs refresh runs train serve clean validate ids db-up db-down db-reset load psql
+.PHONY: setup lint format test up api-up down logs refresh runs dashboard train serve clean validate ids db-up db-down db-reset load psql
 
 # Install dependencies
 setup:
@@ -18,7 +18,8 @@ format:
 test:
 	uv run pytest -v
 
-# Start Postgres, the API and the nightly refresh in Docker (http://127.0.0.1:8000/docs)
+# Start Postgres, the API, the nightly refresh and the dashboard in Docker
+#   dashboard: http://127.0.0.1:8501   API docs: http://127.0.0.1:8000/docs
 up api-up:
 	docker compose up -d --build --wait
 
@@ -70,6 +71,11 @@ refresh:
 # Recent refresh runs
 runs:
 	docker compose exec -T db psql -U hockey -d hockey -P pager=off -c "SET timezone = 'America/New_York'; SELECT run_id, started_at::timestamp(0) AS started_eastern, date_trunc('second', finished_at - started_at) AS took, status, trigger, failed_step, played_after - played_before AS new_games FROM ops.pipeline_runs ORDER BY run_id DESC LIMIT 10"
+
+# Run the dashboard outside Docker (reloads on save): http://127.0.0.1:8501
+# Stop the Docker one first (`docker compose stop dashboard`): both use port 8501
+dashboard:
+	uv run python -m streamlit run src/dashboard/app.py
 
 # Build features
 features:

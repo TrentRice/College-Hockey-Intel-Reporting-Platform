@@ -1,0 +1,11 @@
+# Streamlit settings for the CHIRP dashboard.
+[server]
+address = "127.0.0.1"   # this machine only (the Docker service overrides this inside its container)
+port = 8501
+headless = true
+
+[browser]
+gatherUsageStats = false   # no usage data sent to Streamlit
+
+[client]
+toolbarMode = "minimal"

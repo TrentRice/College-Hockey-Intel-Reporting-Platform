@@ -49,6 +49,8 @@ latest season.
 | `GET /v1/teams/{team_id}/games` | Schedule and results: opponent, home/away, score, W/L/T, OT, shootout, shots. Filter: `played` |
 | `GET /v1/teams/{team_id}/season-stats` | Record, goals, shots, PP %, PK %, faceoff % |
 | `GET /v1/teams/{team_id}/roster` | Skater and goalie season totals |
+| `GET /v1/teams/{team_id}/form` | Team form over the last `last` games (capped at games played), with season totals alongside when that's fewer. Also takes `as_of`. See [features.md](features.md) |
+| `GET /v1/teams/{team_id}/player-form` | Skater and goalie form over the team's last `last` games, season totals alongside, and the likely starting goalie |
 | `GET /v1/games` | Games in date order. Filters: `season`, `date`, `date_from`/`date_to`, `team_id`, `played`, `conference_only`. Paged |
 | `GET /v1/games/{game_id}` | Full box score: game info and officials, each team's stats by period, skaters, goalies, every goal (time, strength, scorer, assists) and penalty |
 | `GET /v1/players` | Player search. `search` matches any spelling and ignores accents ("jeremie" finds "Jérémie"). Filters: `season`, `team_id`, `position`. Paged |

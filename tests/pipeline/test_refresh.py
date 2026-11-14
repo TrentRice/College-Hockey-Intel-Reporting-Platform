@@ -96,3 +96,51 @@ def test_health_reports_the_last_refresh(db, client):
     body = client.get("/health").json()
     assert body["last_refresh"]["status"] == "blocked"
     assert body["data_as_of"] is not None  # from the earlier successful run
+
+
+def insert_running(url):
+    with psycopg.connect(url, autocommit=True) as conn:
+        conn.execute(pipeline.OPS_SQL)
+        conn.execute(
+            "INSERT INTO ops.pipeline_runs (status, trigger) VALUES ('running', 'scheduled')"
+        )
+
+
+def test_an_interrupted_run_is_cleared(db):
+    insert_running(db)  # e.g. the container was rebuilt mid-run
+    with psycopg.connect(db, autocommit=True) as conn:
+        assert pipeline.clear_stale_runs(conn) == 1
+    assert last_run(db)[:3] == ("failed", "scheduled", "interrupted")
+
+
+def test_a_live_run_is_not_cleared(db):
+    insert_running(db)
+    with (
+        psycopg.connect(db, autocommit=True) as holder,
+        psycopg.connect(db, autocommit=True) as conn,
+    ):
+        holder.execute("SELECT pg_advisory_lock(%s)", (pipeline.LOCK_ID,))  # really running
+        assert pipeline.clear_stale_runs(conn) == 0
+    assert last_run(db)[0] == "running"
+
+
+def test_a_new_run_clears_old_orphans(db):
+    insert_running(db)
+    pipeline.refresh("manual", db, steps=[ok("a")])
+    with psycopg.connect(db) as conn:
+        statuses = [
+            r[0] for r in conn.execute("SELECT status FROM ops.pipeline_runs ORDER BY run_id")
+        ]
+    assert statuses == ["failed", "success"]
+
+
+def test_a_manual_load_waits_for_a_running_refresh(db, monkeypatch):
+    from src.db.load import refresh_guard
+
+    monkeypatch.delenv(pipeline.IN_PIPELINE_ENV, raising=False)
+    with psycopg.connect(db, autocommit=True) as holder:
+        holder.execute("SELECT pg_advisory_lock(%s)", (pipeline.LOCK_ID,))
+        with pytest.raises(SystemExit, match="refresh is running"), refresh_guard(db):
+            pass
+    with refresh_guard(db):  # free again
+        pass

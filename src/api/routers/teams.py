@@ -1,19 +1,23 @@
 from __future__ import annotations
 
+import datetime as dt
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
 
 from src.api.db import fetch_all, fetch_one, require_team, resolve_season
 from src.api.models import (
+    PlayerForm,
     Roster,
     TeamDetail,
+    TeamForm,
     TeamGame,
     TeamRef,
     TeamSeasonStats,
     TeamSummary,
 )
 from src.api.params import ConferenceQ, Conn, SeasonQ, TeamId, result, team_ref
+from src.features.form import player_form, team_form
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -161,3 +165,81 @@ def team_roster(conn: Conn, team_id: TeamId, season: SeasonQ = None) -> dict:
         p,
     )
     return {"team": team, "season": season, "skaters": skaters, "goalies": goalies}
+
+
+LastQ = Annotated[
+    int | None,
+    Query(
+        ge=1,
+        description="Last N games. More than the games played uses them all. "
+        "Leave out for the whole season.",
+    ),
+]
+AsOfQ = Annotated[
+    dt.date | None,
+    Query(description="Only games before this date, e.g. the date of the game you're scouting"),
+]
+
+
+def form_header(team: dict, season: str, as_of, form: dict) -> dict:
+    return {
+        "team": team,
+        "season": season,
+        "as_of": as_of,
+        "games_played": form["games_played"],
+        "last": form["last"],
+        "games_used": form["games_used"],
+    }
+
+
+@router.get("/{team_id}/form", response_model=TeamForm, summary="Team form: last N games")
+def team_form_endpoint(
+    conn: Conn, team_id: TeamId, season: SeasonQ = None, last: LastQ = None, as_of: AsOfQ = None
+) -> dict:
+    """Record, scoring, shots, xG, special teams and faceoffs over the team's last `last`
+    games, with the season totals alongside whenever that's fewer than the games played.
+    `games_played` is the most games there are to choose from."""
+    team = require_team(conn, team_id)
+    season = resolve_season(conn, season)
+    form = team_form(conn, team_id, season, last=last, as_of=as_of)
+    if form is None:
+        raise HTTPException(
+            404, f"Team {team_id} has no games played in {season} before {as_of or 'now'}"
+        )
+    return {
+        **form_header(team, season, as_of, form),
+        "window": form["window"],
+        "season_totals": form["season"],
+        "games": form["games"],
+    }
+
+
+@router.get(
+    "/{team_id}/player-form", response_model=PlayerForm, summary="Player form: last N games"
+)
+def player_form_endpoint(
+    conn: Conn, team_id: TeamId, season: SeasonQ = None, last: LastQ = None, as_of: AsOfQ = None
+) -> dict:
+    """Skaters and goalies over the team's last `last` games (a player who missed some shows
+    fewer games), with season totals alongside when that's fewer than the games played, plus
+    the likely starting goalie."""
+    team = require_team(conn, team_id)
+    season = resolve_season(conn, season)
+    form = player_form(conn, team_id, season, last=last, as_of=as_of)
+    if form is None:
+        raise HTTPException(
+            404, f"Team {team_id} has no games played in {season} before {as_of or 'now'}"
+        )
+
+    def rename(lines: list[dict]) -> list[dict]:
+        return [
+            {**{k: v for k, v in x.items() if k != "season"}, "season_totals": x["season"]}
+            for x in lines
+        ]
+
+    return {
+        **form_header(team, season, as_of, form),
+        "skaters": rename(form["skaters"]),
+        "goalies": rename(form["goalies"]),
+        "likely_starter": form["likely_starter"],
+    }

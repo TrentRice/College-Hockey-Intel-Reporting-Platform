@@ -6,6 +6,7 @@
 !config/
 !src/
 !db/
+!.streamlit/
 
 # and nothing generated inside those
 **/__pycache__

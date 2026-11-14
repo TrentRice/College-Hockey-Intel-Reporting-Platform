@@ -52,9 +52,14 @@ Every season on disk (2025-26 and 2026-27) is checked by `src/evaluation/validat
 **Automated refresh**
 During the season the data refreshes itself. A `pipeline` service in Docker runs scrape → download → parse → validate → ids → load once a day after 5 a.m. Eastern, and catches up if the Mac was asleep. Validation acts as a gate: if it fails, the load is skipped and the API keeps the last good data. Every run is recorded (`make runs`) and shown on the API's `/health`. Requests check CHN's robots.txt first. Run it by hand with `make refresh`. See [docs/pipeline.md](docs/pipeline.md).
 
+**Form features**
+Team and player form over the last N games, with the season so far alongside for comparison. Any N works, up to the games played. Team form covers record, streak, scoring, shot share, xG, special teams and faceoffs; player form covers points, PP production, shooting, goalie save % and the likely starter. An `as_of` date limits the numbers to earlier games, and a test checks nothing leaks in from later games. Served by `/v1/teams/{id}/form` and `/player-form`. See [docs/features.md](docs/features.md).
+
+**Scouting dashboard**
+`make up`, then http://127.0.0.1:8501. A Streamlit app that defaults to BU's next opponent, with a **last N games** slider (1 up to the games they've played) and the season so far alongside every number. Tabs: Team (headline numbers with their change, a 20-stat comparison, an actual-vs-expected (xG) goal differential chart by game), Players (skaters and goalies, likely starter), and a head-to-head against BU. It reads only from the API, runs on localhost only, and has Streamlit's usage statistics turned off. See [docs/dashboard.md](docs/dashboard.md).
+
 ### Planned
 
-- **Feature building** (`src/features/`): record, last-5 form, goals for/against, shot differential, special teams, goalie workload, top scorers, point pace
 - **Report generation** (`src/reports/`): HTML or PDF opponent report for BU's next game
 - **Modeling** (`src/models/`): game outcome predictions for each BU game
 
@@ -63,11 +68,11 @@ During the season the data refreshes itself. A `pipeline` service in Docker runs
 The data comes from College Hockey News and isn't in this repo: CHN's terms allow personal, non-commercial use only (see [docs/schema.md](docs/schema.md#data-source-and-use)). Rebuild it locally with the scrapers above, then `make validate`, `make ids`, `make db-up` and `make load`.
 
 ### Tech Stack
-Python, requests, BeautifulSoup (lxml), pandas, PostgreSQL 17, FastAPI, Docker Compose, psycopg, managed with uv.
+Python, requests, BeautifulSoup (lxml), pandas, PostgreSQL 17, FastAPI, Streamlit + Altair, Docker Compose, psycopg, managed with uv.
 
 ### Project Structure
 ```
 data/{raw,interim,processed}/
 db/schema.sql
-src/{ingestion,transform,db,api,evaluation,features,models}/
+src/{ingestion,transform,db,api,pipeline,features,dashboard,evaluation,models}/
 ```

@@ -367,3 +367,133 @@ class SkaterLeader(SkaterLine):
 class GoalieLeader(GoalieLine):
     rank: int
     team: TeamRef
+
+
+# ----------------------------------------------------------------------------
+# Form: last N games next to the season so far
+# ----------------------------------------------------------------------------
+
+
+class TeamFormStats(BaseModel):
+    games: int
+    record: str
+    win_pct: float | None = Field(description="(W + T/2) / games")
+    streak: str | None = Field(examples=["W3"])
+    home_record: str
+    away_record: str
+    neutral_record: str
+    goals_for: int
+    goals_against: int
+    goals_for_per_game: float | None
+    goals_against_per_game: float | None
+    goal_diff_per_game: float | None
+    shots_for_per_game: float | None
+    shots_against_per_game: float | None
+    shot_share: float | None = Field(description="Shots for / all shots in the team's games")
+    xg_share: float | None = Field(description="CHN expected goals for / all xG")
+    xg_for_per_game: float | None
+    xg_against_per_game: float | None
+    shooting_pct: float | None
+    save_pct: float | None = Field(description="Team save %, empty-net goals included")
+    pp_goals: int
+    pp_opportunities: int
+    pp_pct: float | None
+    pk_pct: float | None
+    pp_opportunities_per_game: float | None
+    times_shorthanded_per_game: float | None
+    sh_goals: int
+    pim_per_game: float | None
+    faceoff_pct: float | None
+
+
+class FormGame(BaseModel):
+    game_id: str
+    date: dt.date
+    opponent: TeamRef
+    is_home: bool
+    is_neutral: bool
+    result: Literal["W", "L", "T"]
+    goals_for: int
+    goals_against: int
+    ot_periods: int
+    shootout_won: bool | None
+    shots_for: int
+    shots_against: int
+    xg_for: float | None = Field(description="CHN expected goals; None if not published")
+    xg_against: float | None
+    rest_days: int | None = Field(description="Days since the previous game; None for game 1")
+
+
+class FormWindow(BaseModel):
+    team: TeamRef
+    season: str
+    as_of: dt.date | None = Field(description="Only games before this date count")
+    games_played: int = Field(
+        description="Games played in the season before as_of: the most `last` can use"
+    )
+    last: int | None = Field(description="As requested; None = whole season")
+    games_used: int = Field(description="Games in the window: min(last, games_played)")
+
+
+class TeamForm(FormWindow):
+    window: TeamFormStats = Field(description="The last `games_used` games")
+    season_totals: TeamFormStats | None = Field(
+        description="The whole season so far; included only when the window is shorter"
+    )
+    games: list[FormGame] = Field(description="The games in the window, newest first")
+
+
+class SkaterFormStats(BaseModel):
+    games: int
+    goals: int
+    assists: int
+    points: int
+    points_per_game: float | None
+    pp_goals: int
+    pp_points: int
+    shots: int
+    shooting_pct: float | None
+    plus_minus: int
+    pim: int
+
+
+class GoalieFormStats(BaseModel):
+    games: int
+    starts: int
+    saves: int
+    shots_against: int
+    goals_against: int
+    save_pct: float | None
+    gaa: float | None
+    toi_seconds: int
+
+
+class SkaterForm(BaseModel):
+    player_id: int
+    name: str
+    position: Literal["F", "D"]
+    window: SkaterFormStats = Field(description="Over the team's last `games_used` games")
+    season_totals: SkaterFormStats | None
+
+
+class GoalieForm(BaseModel):
+    player_id: int
+    name: str
+    window: GoalieFormStats
+    season_totals: GoalieFormStats | None
+
+
+class LikelyStarter(BaseModel):
+    player_id: int
+    name: str
+    starts: int = Field(description="Starts in the team's last `of_last` games")
+    of_last: int
+    started_last_game: bool
+
+
+class PlayerForm(FormWindow):
+    skaters: list[SkaterForm] = Field(description="Most points in the window first")
+    goalies: list[GoalieForm]
+    likely_starter: LikelyStarter | None = Field(
+        description="Most starts in the team's last 5 games (ties: most recent start)"
+    )
