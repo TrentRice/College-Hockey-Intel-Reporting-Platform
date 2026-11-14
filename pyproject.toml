@@ -31,5 +31,7 @@ dev = [
     "ipykernel>=7.4.0",
     "matplotlib>=3.11.2",
     "nbconvert>=7.17.2",
+    "nbstripout>=0.9.1",
     "pytest>=9.1.1",
+    "scikit-learn>=1.9.1",
 ]

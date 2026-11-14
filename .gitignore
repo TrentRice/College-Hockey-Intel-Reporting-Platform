@@ -19,3 +19,6 @@ data/processed/validation/
 
 # Pipeline run logs (contain data excerpts)
 logs/
+
+# Jupyter
+.ipynb_checkpoints/
