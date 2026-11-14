@@ -60,6 +60,24 @@ save. Stop the Docker one first (`docker compose stop dashboard`), because both 
   means one side has nothing to compare, such as no away games yet or no xG.
 - Meetings between the two teams earlier this season.
 
+**Win probability tab**: your team against the scouted team, like the other tabs.
+- **Next opponent:** the scheduled game, using each team's games before that date.
+- **Any team:**
+  - Your team against whichever team you pick, scheduled or not, using games before the
+    sidebar's "Only games before" date.
+  - Pick where it's played: **Home / Away / Neutral site**. It starts at the venue of their
+    next scheduled meeting if there is one, and at Home otherwise.
+  - Switching venue shows what home ice is worth in that matchup.
+- **What it shows:**
+  - Both teams' chances, as numbers and a bar.
+  - The **biggest factor**, plus a table of the three inputs side by side: close-game shot
+    share, goal differential per game, and home ice.
+  - **Effect on chance** is how many points each factor moves your team's chance compared
+    with it being even: green helps, red hurts.
+- **A warning** appears when a team has played fewer than 3 games, below the model's
+  warm-up.
+- **No prediction** for a game against a non-D-I team or a TBD opponent. The tab says why.
+
 **Sorting.** Click a column header to sort, and click again to reverse. The difference
 columns hold real numbers, so ascending puts the biggest drop first and descending the biggest
 gain first. In the team table the rows mix units (percentage points and per-game numbers), so
@@ -68,7 +86,8 @@ sorting there groups by size rather than comparing like with like.
 ## How it fits together
 
 The dashboard reads **only from the API** (`/v1/teams/{id}/form`, `/player-form`,
-`/games`, `/health`) with your `API_KEY`. It never connects to the database. Responses are
+`/games`, `/v1/games/{id}/prediction`, `/v1/matchup`, `/health`) with your `API_KEY`. It never connects to
+the database. Responses are
 cached for 5 minutes, and the sidebar shows when the data was last refreshed. If the latest
 nightly refresh failed or was blocked, it shows a warning.
 

@@ -3,11 +3,12 @@ from __future__ import annotations
 import datetime as dt
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, HTTPException, Path, Query, Request
 
-from src.api.db import fetch_all, fetch_one, resolve_season
-from src.api.models import BoxScore, GameSummary, Page
+from src.api.db import fetch_all, fetch_one, require_team, resolve_season
+from src.api.models import BoxScore, GamePrediction, GameSummary, MatchupPrediction, Page
 from src.api.params import Conn, PagingQ, SeasonQ, mmss, page, player_ref, team_ref
+from src.models.win_model import predict_game, predict_matchup
 
 router = APIRouter(prefix="/games", tags=["games"])
 
@@ -199,3 +200,95 @@ def box_score(
         r["player"] = player_ref(r.pop("player_id"), r.pop("player_name"))
 
     return {"game": game, "teams": teams, "goals": goals, "penalties": penalties}
+
+
+@router.get(
+    "/{game_id}/prediction",
+    response_model=GamePrediction,
+    summary="Win probability (model v1)",
+    responses={422: {"description": "Not a D-I vs D-I game, or a team is TBD"},
+               503: {"description": "No model loaded"}},
+)
+def game_prediction(
+    request: Request,
+    conn: Conn,
+    game_id: Annotated[str, Path(description="e.g. 2026-11-15_10_4 (from the games list)")],
+) -> dict:
+    """The home team's chance of winning, from each team's season so far (games before this
+    game's date). Works for upcoming and played games; for a played game it shows what the
+    model would have said beforehand."""
+    card = request.app.state.win_card
+    if card is None:
+        raise HTTPException(503, request.app.state.win_card_error)
+    row = fetch_one(
+        conn,
+        f"""
+        SELECT {GAME_COLUMNS}, g.game_date, h.is_d1 AS home_d1, a.is_d1 AS away_d1
+        {GAME_JOINS}
+        WHERE g.game_id = %(g)s
+        """,
+        {"g": game_id},
+    )
+    if row is None:
+        raise HTTPException(404, f"Game {game_id} not found")
+    if row["home_team_id"] is None or row["away_team_id"] is None:
+        raise HTTPException(422, "A team in this game is still TBD")
+    if not (row["home_d1"] and row["away_d1"]):
+        raise HTTPException(422, "The model covers D-I vs D-I games only")
+    pred = predict_game(conn, card, row)
+    home_in, away_in = pred.pop("home_inputs"), pred.pop("away_inputs")
+    game_date = row.pop("game_date")
+    row.pop("home_d1"), row.pop("away_d1")
+    game = shape_game(row)
+    assert game_date == game["date"]
+    return {
+        **pred,
+        "game": game,
+        "home": {"team": game["home"], **home_in},
+        "away": {"team": game["away"], **away_in},
+    }
+
+
+matchup_router = APIRouter(tags=["games"])
+
+
+@matchup_router.get(
+    "/matchup",
+    response_model=MatchupPrediction,
+    summary="Win probability for any two teams (model v1)",
+    responses={422: {"description": "Same team twice, or a non-D-I team"},
+               503: {"description": "No model loaded"}},
+)
+def matchup_prediction(
+    request: Request,
+    conn: Conn,
+    home_team_id: Annotated[int, Query(ge=1, description="The home side (or listed first at a neutral site)")],
+    away_team_id: Annotated[int, Query(ge=1)],
+    season: SeasonQ = None,
+    as_of: Annotated[dt.date | None, Query(description="Use games before this date (default: today)")] = None,
+    neutral: Annotated[bool, Query(description="Neutral site: no home edge")] = False,
+) -> dict:
+    """The home side's chance of beating the away side, from each team's season so far,
+    whether or not they're scheduled to play. Same model and rules as a game's prediction."""
+    card = request.app.state.win_card
+    if card is None:
+        raise HTTPException(503, request.app.state.win_card_error)
+    if home_team_id == away_team_id:
+        raise HTTPException(422, "Pick two different teams")
+    season = resolve_season(conn, season)
+    teams = {}
+    for tid in (home_team_id, away_team_id):
+        require_team(conn, tid)
+        teams[tid] = fetch_one(conn, "SELECT team_id, name, is_d1 FROM teams WHERE team_id = %(t)s", {"t": tid})
+        if not teams[tid]["is_d1"]:
+            raise HTTPException(422, "The model covers D-I teams only")
+    before = as_of or dt.date.today()
+    pred = predict_matchup(conn, card, season, home_team_id, away_team_id, before, neutral=neutral)
+    home_in, away_in = pred.pop("home_inputs"), pred.pop("away_inputs")
+    return {
+        **pred,
+        "season": season,
+        "neutral_site": neutral,
+        "home": {"team": team_ref(home_team_id, teams[home_team_id]["name"]), **home_in},
+        "away": {"team": team_ref(away_team_id, teams[away_team_id]["name"]), **away_in},
+    }

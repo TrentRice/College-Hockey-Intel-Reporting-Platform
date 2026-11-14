@@ -1,0 +1,45 @@
+{
+  "name": "win_model_v1",
+  "trained_on": {
+    "season": "2025-26",
+    "games": 957,
+    "rules": "D-I vs D-I, ties dropped, both teams >= 3 games played"
+  },
+  "trained_at": "2026-11-14",
+  "features": [
+    "diff_close_shot_share_season",
+    "diff_goal_diff_pg_no_en_season"
+  ],
+  "home_ice_switch": "1 = home game, 0 = neutral site; no separate intercept",
+  "model": {
+    "type": "LogisticRegression",
+    "penalty": "l2",
+    "C": 1.0,
+    "fit_intercept": false,
+    "scaling": "StandardScaler(with_mean=False) on the stat features"
+  },
+  "coefficients": {
+    "diff_close_shot_share_season": 0.6765738489780599,
+    "diff_goal_diff_pg_no_en_season": 0.21642484771535708,
+    "home_ice": 0.2064907962201385
+  },
+  "feature_scales": {
+    "diff_close_shot_share_season": 0.08439123585672313,
+    "diff_goal_diff_pg_no_en_season": 1.7077088949806847
+  },
+  "sklearn_version": "1.9.1",
+  "sha256": "8ec75af8f3dfd83c9c8fcda25d0ef0cf9625a4950f0e6ef0bf20bbe840bb39f8",
+  "test_runs": [
+    {
+      "run_at": "2026-11-14",
+      "season": "2026-27",
+      "games": 173,
+      "through": "2026-11-13",
+      "log_loss": 0.643,
+      "auc": 0.672,
+      "accuracy": 0.636,
+      "baseline_home_rate_log_loss": 0.6796,
+      "baseline_win_pct_log_loss": 0.6867
+    }
+  ]
+}

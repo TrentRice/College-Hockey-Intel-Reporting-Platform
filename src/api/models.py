@@ -497,3 +497,46 @@ class PlayerForm(FormWindow):
     likely_starter: LikelyStarter | None = Field(
         description="Most starts in the team's last 5 games (ties: most recent start)"
     )
+
+
+# ----------------------------------------------------------------------------
+# Win probability (model v1; see docs/eda.md and notebooks/09_model.ipynb)
+# ----------------------------------------------------------------------------
+
+
+class ModelInputs(BaseModel):
+    team: TeamRef
+    games_played: int = Field(description="D-I games this season before the game's date")
+    close_shot_share: float | None = Field(
+        description="Share of shots on goal in periods that started tied or within one goal"
+    )
+    goal_diff_per_game: float | None = Field(
+        description="(Goals for − empty-net goals − goals against) ÷ games"
+    )
+
+
+class Prediction(BaseModel):
+    model: str = Field(examples=["win_model_v1"])
+    as_of: dt.date = Field(description="Inputs use only games before this date")
+    home_win_probability: float = Field(
+        description="Chance the home team wins if the game has a winner (ties excluded)"
+    )
+    away_win_probability: float
+    home_ice: bool = Field(description="False at a neutral site: no home edge applied")
+    factors: dict[str, float] = Field(
+        description="How much each factor moves the home team's chance: the probability minus "
+        "what it would be with that factor even (home_ice, close_shot_share, goal_diff_per_game)"
+    )
+    home: ModelInputs
+    away: ModelInputs
+    reliable: bool = Field(description="Both teams have played at least 3 games (the warm-up)")
+    note: str | None
+
+
+class GamePrediction(Prediction):
+    game: GameSummary
+
+
+class MatchupPrediction(Prediction):
+    season: str
+    neutral_site: bool

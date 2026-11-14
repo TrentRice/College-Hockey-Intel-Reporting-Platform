@@ -4,7 +4,8 @@ CHIRP scouting dashboard (Streamlit). Reads everything through the CHIRP API.
   make dashboard        -> http://127.0.0.1:8501   (or `make up` for the Docker version)
 
 Pick a team (by default your team's next opponent) and how many recent games to look at.
-Every "last N" number sits next to the season so far.
+Every "last N" number sits next to the season so far. The Win probability tab shows your
+team's chance against the scouted team (win model v1, via the API).
 """
 
 from __future__ import annotations
@@ -180,10 +181,12 @@ with st.sidebar:
     )
 
     season_form = cached("team_form", scouted["team_id"], season, None, as_of)
+    scout_error = None  # shown in the scouting tabs; the Win probability tab still works
+    games_played = season_form["games_played"] if season_form else 0
     if season_form is None:
-        stop_with(f"{scouted['name']} hasn't played a game in {season} before {as_of:%b %-d}.")
-    games_played = season_form["games_played"]
-    if games_played > 1:
+        scout_error = f"{scouted['name']} hasn't played a game in {season} before {as_of:%b %-d}."
+        last = 1
+    elif games_played > 1:
         last = st.slider(
             "Last N games",
             min_value=1,
@@ -205,25 +208,194 @@ with st.sidebar:
     if last_run and last_run["status"] in ("failed", "blocked"):
         st.warning(f"Latest refresh {last_run['status']}; the data is from the last good run.")
 
+
+# ----------------------------------------------------------------------------
+# Win probability: any team's next game (win model v1)
+# ----------------------------------------------------------------------------
+
+FACTOR_LABELS = {
+    "close_shot_share": "Close-game shot share",
+    "goal_diff_per_game": "Goal differential / game",
+    "home_ice": "Home ice",
+}
+
+
+def probability_bar(team: str, p: float, opponent: str) -> alt.Chart:
+    colors = palette()
+    df = pd.DataFrame(
+        [
+            {"team": team, "share": p, "start": 0.0, "label": f"{team} {p:.0%}"},
+            {"team": opponent, "share": 1 - p, "start": p, "label": f"{opponent} {1 - p:.0%}"},
+        ]
+    )
+    df["end"] = df["start"] + df["share"]
+    df["mid"] = df["start"] + df["share"] / 2
+    color = alt.Color(
+        "team:N",
+        scale=alt.Scale(domain=[team, opponent], range=[colors["pos"], colors["ref"]]),
+        legend=None,
+    )
+    bars = (
+        alt.Chart(df)
+        .mark_bar(height=34, cornerRadius=4)
+        .encode(
+            x=alt.X("start:Q", scale=alt.Scale(domain=[0, 1]), axis=None),
+            x2="end:Q",
+            color=color,
+            tooltip=[alt.Tooltip("team:N", title="Team"), alt.Tooltip("share:Q", title="Chance", format=".1%")],
+        )
+    )
+    labels = (
+        alt.Chart(df)
+        .mark_text(color="white", fontWeight="bold", fontSize=13)
+        .encode(x="mid:Q", text="label:N")
+    )
+    return (bars + labels).properties(height=44)
+
+
+VENUES = ["Home", "Away", "Neutral site"]
+
+
+def show_prediction(pred: dict, team: dict, title: str) -> None:
+    """One prediction from `team`'s side: the chance, the bar, and what drives it."""
+    team_name = team["name"]
+    is_home = pred["home"]["team"]["team_id"] == team["team_id"]
+    mine, theirs = (pred["home"], pred["away"]) if is_home else (pred["away"], pred["home"])
+    opp_name = theirs["team"]["name"]
+    p = pred["home_win_probability"] if is_home else pred["away_win_probability"]
+    sign = 1 if is_home else -1  # factors are from the home team's side
+
+    st.subheader(title)
+    c1, c2 = st.columns(2)
+    c1.metric(f"{team_name} win", f"{p:.0%}")
+    c2.metric(f"{opp_name} win", f"{1 - p:.0%}")
+    st.altair_chart(probability_bar(team_name, p, opp_name), width="stretch")
+    if not pred["reliable"]:
+        st.warning(pred["note"])
+
+    effects = {k: sign * v * 100 for k, v in pred["factors"].items()}
+    biggest = max(effects, key=lambda k: abs(effects[k]))
+    lean = "for" if effects[biggest] > 0 else "against"
+    st.markdown(
+        f"**Biggest factor: {FACTOR_LABELS[biggest].lower()}**, "
+        f"{abs(effects[biggest]):.1f} points {lean} {team_name}."
+    )
+
+    def pct(v):
+        return "–" if v is None else f"{v:.1%}"
+
+    def num(v):
+        return "–" if v is None else f"{v:+.2f}"
+
+    where = "neutral site" if not pred["home_ice"] else ("home" if is_home else "away")
+    rows = [
+        {"Factor": FACTOR_LABELS["close_shot_share"], team_name: pct(mine["close_shot_share"]),
+         opp_name: pct(theirs["close_shot_share"]), "Effect on chance": effects["close_shot_share"]},
+        {"Factor": FACTOR_LABELS["goal_diff_per_game"], team_name: num(mine["goal_diff_per_game"]),
+         opp_name: num(theirs["goal_diff_per_game"]), "Effect on chance": effects["goal_diff_per_game"]},
+        {"Factor": FACTOR_LABELS["home_ice"], team_name: where,
+         opp_name: {"home": "away", "away": "home"}.get(where, where), "Effect on chance": effects["home_ice"]},
+        {"Factor": "Games played", team_name: str(mine["games_played"]),
+         opp_name: str(theirs["games_played"]), "Effect on chance": None},
+    ]
+    st.dataframe(
+        style_signed(pd.DataFrame(rows), "Effect on chance", "pct"),
+        hide_index=True,
+        width="stretch",
+        placeholder="",
+    )
+    st.caption(
+        f"Each team's season before {pd.Timestamp(pred['as_of']):%b %-d}, D-I games only. "
+        "**Effect on chance**: how many points that factor moves "
+        f"{team_name}'s chance, compared with it being even. Close-game shot share counts "
+        "shots in periods that started tied or within one goal. Goal differential leaves "
+        "out empty-net goals."
+    )
+    st.caption(
+        f"Model {pred['model']}, trained on 2025-26. The chance is for a game that has a "
+        "winner: about 7% of college games end tied. On 2026-27 games so far it predicts "
+        "better than picking the home team, but treat it as a probability, not a pick."
+    )
+
+
+def render_win_probability() -> None:
+    """Your team (sidebar) against the scouted team, like the other tabs.
+
+    Next opponent: their scheduled game, using each team's games before that date.
+    Any team: any opponent, scheduled or not, using games before the sidebar date, at a venue
+    picked here (it starts at their next scheduled meeting's venue, or home).
+    """
+    if mode == "Next opponent" and upcoming and upcoming["opponent"]:
+        pred = cached("prediction", upcoming["game_id"])
+        if not pred or "home_win_probability" not in pred:
+            st.info(
+                f"No prediction for {home_name}'s next game ({describe_game(upcoming)}): "
+                "the model covers games between two D-I teams only."
+            )
+            return
+        show_prediction(pred, home, f"{home_name} {describe_game(upcoming)}")
+        return
+
+    if scouted["team_id"] == home["team_id"]:
+        st.info("Pick a different team to compare.")
+        return
+    today = dt.date.today()
+    meeting = next(
+        (g for g in sorted(home_schedule, key=lambda g: (str(g["date"]), g["game_id"]))
+         if not g["is_played"] and g["opponent"]
+         and g["opponent"]["team_id"] == scouted["team_id"]
+         and dt.date.fromisoformat(str(g["date"])) >= today),
+        None,
+    )
+    default = "Home"
+    if meeting:
+        default = "Neutral site" if meeting.get("is_neutral") else ("Home" if meeting["is_home"] else "Away")
+    venue = st.radio(
+        f"Where {home_name} plays", VENUES, index=VENUES.index(default), horizontal=True,
+        key="win_venue",
+        help="Home ice is worth a few points; a neutral site gives no home edge.",
+    )
+    home_id, away_id = (scouted["team_id"], home["team_id"]) if venue == "Away" else (home["team_id"], scouted["team_id"])
+    pred = cached("matchup", season, home_id, away_id, as_of, venue == "Neutral site")
+    if not pred or "home_win_probability" not in pred:
+        st.info(f"No prediction for {home_name} vs {scouted['name']}: the model covers D-I teams only.")
+        return
+    where = {"Home": "at home", "Away": "away", "Neutral site": "at a neutral site"}[venue]
+    show_prediction(pred, home, f"{home_name} vs {scouted['name']}, {where}")
+    note = f"A matchup, using each team's games before {as_of:%b %-d} (the sidebar date)."
+    if meeting:
+        note += f" They're scheduled to meet {describe_game(meeting).split(', ')[-1]}."
+    st.caption(note)
+
+
+# ----------------------------------------------------------------------------
+# Header and tabs
+# ----------------------------------------------------------------------------
+
+st.title(scouted["name"])
+header_caption = st.empty()
+tab_team, tab_players, tab_h2h, tab_win = st.tabs(
+    ["Team", "Players", f"vs {home_name}", "Win probability"]
+)
+with tab_win:
+    render_win_probability()
+if scout_error:
+    with tab_team:
+        st.error(scout_error)
+    st.stop()
+
 form = cached("team_form", scouted["team_id"], season, last, as_of)
 players = cached("player_form", scouted["team_id"], season, last, as_of)
 window = form["window"]
 season_totals = form["season_totals"]  # None when the window is the whole season
 window_label = "Season" if full_season else f"Last {form['games_used']}"
 
-# ----------------------------------------------------------------------------
-# Header
-# ----------------------------------------------------------------------------
-
-st.title(scouted["name"])
 subtitle = [f"{window['record']} {window_label.lower()}"]
 if season_totals:
     subtitle.append(f"{season_totals['record']} season")
 if window.get("streak"):
     subtitle.append(f"streak {window['streak']}")
-st.caption(" · ".join(subtitle) + f" · {games_played} games before {as_of:%b %-d}")
-
-tab_team, tab_players, tab_h2h = st.tabs(["Team", "Players", f"vs {home_name}"])
+header_caption.caption(" · ".join(subtitle) + f" · {games_played} games before {as_of:%b %-d}")
 
 # ----------------------------------------------------------------------------
 # Team

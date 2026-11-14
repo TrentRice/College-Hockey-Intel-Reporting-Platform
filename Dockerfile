@@ -21,6 +21,8 @@ COPY config ./config
 COPY src ./src
 COPY db ./db
 COPY .streamlit ./.streamlit
+# The frozen win model's card (coefficients only; the .joblib file stays out of the image)
+COPY models/*.json ./models/
 
 # never run as root
 RUN useradd --system --uid 10001 chirp

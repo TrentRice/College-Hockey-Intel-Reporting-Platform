@@ -39,13 +39,13 @@ INSERT INTO games (game_id, season, game_date, home_team_id, away_team_id, home_
 INSERT INTO team_game_stats (game_id, team_id, opponent_team_id, is_home, goals, goals_against,
                              shots, shots_against, pp_goals, pp_opportunities, sh_goals, en_goals,
                              pp_goals_against, times_shorthanded, penalties, pim,
-                             faceoffs_won, faceoffs_lost) VALUES
-    ('g1', 1, 2, TRUE,  4, 2, 35, 25, 1, 4, 0, 1, 1, 3, 3, 6, 30, 20),
-    ('g1', 2, 1, FALSE, 2, 4, 25, 35, 1, 3, 0, 0, 1, 4, 4, 8, 20, 30),
-    ('g2', 2, 1, TRUE,  3, 3, 28, 30, 0, 2, 0, 0, 1, 2, 2, 4, 25, 25),
-    ('g2', 1, 2, FALSE, 3, 3, 30, 28, 1, 2, 0, 0, 0, 2, 2, 4, 25, 25),
-    ('g5', 1, 2, TRUE,  1, 5, 20, 40, 0, 1, 0, 0, 2, 5, 5, 10, 15, 35),
-    ('g5', 2, 1, FALSE, 5, 1, 40, 20, 2, 5, 0, 0, 0, 1, 1, 2, 35, 15);
+                             faceoffs_won, faceoffs_lost, shots_p1, shots_p2, shots_p3, shots_ot) VALUES
+    ('g1', 1, 2, TRUE,  4, 2, 35, 25, 1, 4, 0, 1, 1, 3, 3, 6, 30, 20, 12, 11, 12, NULL),
+    ('g1', 2, 1, FALSE, 2, 4, 25, 35, 1, 3, 0, 0, 1, 4, 4, 8, 20, 30, 8, 9, 8, NULL),
+    ('g2', 2, 1, TRUE,  3, 3, 28, 30, 0, 2, 0, 0, 1, 2, 2, 4, 25, 25, 9, 9, 9, 1),
+    ('g2', 1, 2, FALSE, 3, 3, 30, 28, 1, 2, 0, 0, 0, 2, 2, 4, 25, 25, 10, 10, 9, 1),
+    ('g5', 1, 2, TRUE,  1, 5, 20, 40, 0, 1, 0, 0, 2, 5, 5, 10, 15, 35, 7, 7, 6, NULL),
+    ('g5', 2, 1, FALSE, 5, 1, 40, 20, 2, 5, 0, 0, 0, 1, 1, 2, 35, 15, 13, 14, 13, NULL);
 
 INSERT INTO skater_game_stats (game_id, player_id, team_id, position, goals, assists, points,
                                plus_minus, shots, pim) VALUES

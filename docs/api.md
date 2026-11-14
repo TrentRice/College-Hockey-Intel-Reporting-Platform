@@ -53,6 +53,8 @@ latest season.
 | `GET /v1/teams/{team_id}/player-form` | Skater and goalie form over the team's last `last` games, season totals alongside, and the likely starting goalie |
 | `GET /v1/games` | Games in date order. Filters: `season`, `date`, `date_from`/`date_to`, `team_id`, `played`, `conference_only`. Paged |
 | `GET /v1/games/{game_id}` | Full box score: game info and officials, each team's stats by period, skaters, goalies, every goal (time, strength, scorer, assists) and penalty |
+| `GET /v1/games/{game_id}/prediction` | Win probability from model v1: each team's inputs (games played, close-game shot share, goal differential) from games **before** the game's date, the home and away chances, and how much each factor moves them. Works for upcoming and played games. See below |
+| `GET /v1/matchup` | Win probability for **any two D-I teams**, scheduled or not: `home_team_id`, `away_team_id`, `neutral`, `as_of` (games before this date; default today), `season`. Same model and response as a game's prediction, without the game |
 | `GET /v1/players` | Player search. `search` matches any spelling and ignores accents ("jeremie" finds "Jérémie"). Filters: `season`, `team_id`, `position`. Paged |
 | `GET /v1/players/{player_id}` | Profile: every spelling, plus each season's team and skater or goalie totals |
 | `GET /v1/players/{player_id}/games` | Game log: opponent, result, and that game's stats. Filter: `season` |
@@ -67,6 +69,23 @@ Use `limit` (at most 200) and `offset` to page through results.
 **Merged player ids.** If new data showed two ids were the same player, the retired id
 answers `308 Permanent Redirect` to the current one, query string included. Clients that
 follow redirects get the right player automatically.
+
+**Win probability.** `GET /v1/games/{game_id}/prediction` applies the frozen win model
+(`models/win_model_v1.json`; how it was built: [eda.md](eda.md),
+`notebooks/09_model.ipynb`).
+- **The chance is for a game that has a winner.** Ties (about 7% of games) weren't in the
+  training data.
+- **`factors`** say how many points each input moves the home team's chance, compared with
+  that input being even.
+- **`reliable` is false** when a team has played fewer than 3 games, the training warm-up.
+  The number is still given, with a `note`.
+- **Games it can't predict** return `422`: a team still TBD, or a non-D-I opponent. For
+  `/v1/matchup`: the same team twice, or a non-D-I team.
+- **Without the model card** the endpoint returns `503`, and the rest of the API keeps
+  working.
+- **It stays in step with notebook 09.** The API computes the inputs in
+  `src/models/win_model.py`, and notebook 09 checks that they match the training features
+  exactly.
 
 Errors: `401` for a missing or wrong key, `404` for an unknown team or season, and `422` for
 a badly formed parameter (for example `season=2026`).

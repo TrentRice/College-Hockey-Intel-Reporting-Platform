@@ -22,6 +22,7 @@ from config.settings import settings
 from src.api.db import make_pool
 from src.api.routers import games, leaders, meta, players, teams
 from src.api.security import require_api_key
+from src.models.win_model import ModelUnavailable, load_card
 
 log = logging.getLogger("chirp.api")
 
@@ -55,11 +56,16 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
         lifespan=lifespan,
     )
     app.state.api_key = key
+    try:  # the frozen win model's card; without it, only the prediction endpoint is off
+        app.state.win_card, app.state.win_card_error = load_card(), None
+    except ModelUnavailable as e:
+        log.warning("Win model unavailable: %s", e)
+        app.state.win_card, app.state.win_card_error = None, str(e)
 
     v1 = [Depends(require_api_key)]
     app.include_router(meta.health_router)
     app.include_router(meta.router, prefix="/v1", dependencies=v1)
-    for r in (teams.router, games.router, players.router, leaders.router):
+    for r in (teams.router, games.router, games.matchup_router, players.router, leaders.router):
         app.include_router(r, prefix="/v1", dependencies=v1)
     return app
 

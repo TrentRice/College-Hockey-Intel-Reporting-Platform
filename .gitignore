@@ -22,3 +22,6 @@ logs/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Frozen model files (the .json cards are committed)
+models/*.joblib

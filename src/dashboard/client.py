@@ -65,3 +65,24 @@ def team_form(team_id: int, season: str, last: int | None, as_of: dt.date | None
 
 def player_form(team_id: int, season: str, last: int | None, as_of: dt.date | None) -> dict | None:
     return get(f"/v1/teams/{team_id}/player-form", season=season, last=last, as_of=as_of)
+
+
+def prediction(game_id: str) -> dict | None:
+    """Win probability for one game (model v1). None if the game can't be predicted."""
+    try:
+        return get(f"/v1/games/{game_id}/prediction")
+    except ApiError as e:
+        if "error 422" in str(e) or "error 503" in str(e):
+            return None
+        raise
+
+
+def matchup(season: str, home_id: int, away_id: int, as_of: dt.date, neutral: bool) -> dict | None:
+    """Win probability for any two D-I teams (model v1), using games before `as_of`."""
+    try:
+        return get("/v1/matchup", season=season, home_team_id=home_id, away_team_id=away_id,
+                   as_of=as_of, neutral=str(neutral).lower())
+    except ApiError as e:
+        if "error 422" in str(e) or "error 503" in str(e):
+            return None
+        raise
