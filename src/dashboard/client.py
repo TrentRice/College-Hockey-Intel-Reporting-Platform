@@ -86,3 +86,28 @@ def matchup(season: str, home_id: int, away_id: int, as_of: dt.date, neutral: bo
         if "error 422" in str(e) or "error 503" in str(e):
             return None
         raise
+
+
+def prediction_log(
+    season: str, team_id: int | None, played: bool | None, backfilled: bool,
+    reliable_only: bool = False, limit: int = 50,
+) -> list[dict]:
+    """The prediction log (newest first), with results for played games."""
+    played_s = None if played is None else str(played).lower()
+    page = get("/v1/predictions", season=season, team_id=team_id, played=played_s,
+               backfilled=str(backfilled).lower(), reliable_only=str(reliable_only).lower(),
+               limit=limit)
+    return page["items"] if page else []
+
+
+def prediction_summary(
+    season: str, team_id: int | None, backfilled: bool, reliable_only: bool = False
+) -> dict | None:
+    """How the logged predictions have done: accuracy, log loss, calibration."""
+    return get("/v1/predictions/summary", season=season, team_id=team_id,
+               backfilled=str(backfilled).lower(), reliable_only=str(reliable_only).lower())
+
+
+def rankings(season: str, as_of: dt.date, min_games: int | None = None) -> dict | None:
+    """Every ranked D-I team, best first (win model v1), using games before `as_of`."""
+    return get("/v1/rankings", season=season, as_of=as_of, min_games=min_games)

@@ -62,7 +62,7 @@ def load_card(path: Path = CARD_PATH) -> dict[str, Any]:
 # One row per D-I vs D-I game the team played before the date, with what's needed for
 # close-game shots: period shots for both sides and each side's goals after periods 1 and 2.
 TEAM_GAMES_SQL = """
-SELECT t.goals_for, t.goals_against, t.en_goals,
+SELECT t.result, t.goals_for, t.goals_against, t.en_goals,
        s.shots_p1, s.shots_p2, s.shots_p3,
        o.shots_p1 AS opp_p1, o.shots_p2 AS opp_p2, o.shots_p3 AS opp_p3,
        COALESCE(g.my1, 0) AS my1, COALESCE(g.my2, 0) AS my2,
@@ -115,6 +115,9 @@ def team_inputs(conn, team_id: int, season: str, before: dt.date) -> dict[str, A
         "games_played": n,
         "close_shot_share": sf / (sf + sa) if (sf + sa) else None,
         "goal_diff_per_game": gd / n if n else None,
+        "wins": sum(r["result"] == "W" for r in rows),
+        "losses": sum(r["result"] == "L" for r in rows),
+        "ties": sum(r["result"] == "T" for r in rows),
     }
 
 
@@ -173,3 +176,56 @@ def predict_game(conn, card: dict[str, Any], game: dict[str, Any]) -> dict[str, 
         conn, card, game["season"], game["home_team_id"], game["away_team_id"],
         game["game_date"], neutral=game["is_neutral"],
     )
+
+
+# ----------------------------------------------------------------------------
+# Rankings: the same model, read as one rating per team
+# ----------------------------------------------------------------------------
+#
+# At a neutral site the model's score is (home rating) - (away rating), where
+#   rating = sum over inputs of coefficient * team's input / scale
+# so every team has one strength number, and ordering by it agrees with every neutral-site
+# head-to-head prediction. "Beats an average team" is the neutral-site chance against the
+# average rating of the ranked teams.
+
+RANK_MIN_GAMES = 5  # shot share needs about 4-8 games to mean much (EDA step 4)
+
+D1_TEAMS_SQL = """
+SELECT DISTINCT t.team_id, t.name
+FROM hockey.teams t
+JOIN features.team_games tg ON tg.team_id = t.team_id
+WHERE t.is_d1 AND tg.season = %(season)s
+ORDER BY t.team_id
+"""
+
+
+def team_rating(card: dict[str, Any], inputs: dict[str, Any]) -> float | None:
+    """A team's neutral-site strength. None if an input is missing."""
+    total = 0.0
+    for feature, key in INPUTS.items():
+        if inputs.get(key) is None:
+            return None
+        total += card["coefficients"][feature] * inputs[key] / card["feature_scales"][feature]
+    return total
+
+
+def rank_teams(
+    conn, card: dict[str, Any], season: str, before: dt.date, min_games: int = RANK_MIN_GAMES
+) -> dict[str, Any]:
+    """Every D-I team with at least `min_games` games before `before`, best first."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        teams = cur.execute(D1_TEAMS_SQL, {"season": season}).fetchall()
+    rows, unranked = [], 0
+    for t in teams:
+        inputs = team_inputs(conn, t["team_id"], season, before)
+        rating = team_rating(card, inputs)
+        if inputs["games_played"] < min_games or rating is None:
+            unranked += 1
+            continue
+        rows.append({"team_id": t["team_id"], "name": t["name"], "rating": rating, **inputs})
+    rows.sort(key=lambda r: (-r["rating"], r["name"]))
+    average = sum(r["rating"] for r in rows) / len(rows) if rows else None
+    for i, r in enumerate(rows, start=1):
+        r["rank"] = i
+        r["beats_average"] = 1 / (1 + math.exp(-(r["rating"] - average)))
+    return {"teams": rows, "average_rating": average, "unranked": unranked}

@@ -50,6 +50,15 @@ erDiagram
 The views `skater_season_totals`, `goalie_season_totals` and `team_season_totals` add up the
 fact tables by season (points, save %, GAA, PP %, PK %, faceoff %).
 
+**Prediction log:** `predictions.game_predictions` ([db/predictions.sql](../db/predictions.sql)),
+one row per game per model version.
+- **Contents:** the win probability, both teams' inputs, whether it was backfilled, and when
+  it was logged.
+- **Separate schema:** it lives outside `hockey` so the nightly full reload can't touch it,
+  and it has no foreign keys into `hockey`. Game and team ids are stable across loads.
+- **Results aren't stored.** Readers join `hockey.games`, so a corrected score is picked up.
+- **Writer:** `src/pipeline/predict.py` (nightly, see [pipeline.md](pipeline.md)).
+
 ## Loading the database
 
 ```

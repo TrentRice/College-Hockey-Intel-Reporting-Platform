@@ -368,17 +368,237 @@ def render_win_probability() -> None:
     st.caption(note)
 
 
+
+def matchup_label(r: dict) -> str:
+    if r["neutral"]:
+        return f"{r['home']['name']} vs {r['away']['name']} (neutral)"
+    return f"{r['away']['name']} at {r['home']['name']}"
+
+
+def render_model_record() -> None:
+    """The prediction log: every D-I game's chance, saved before the game, then graded."""
+    st.caption(
+        "Every D-I game's win probability is saved by the nightly refresh before the game, "
+        "locked on game day, and checked against the result."
+    )
+    c1, c2, c3 = st.columns(3)
+    only_mine = c1.toggle(f"Only {home_name}'s games", key="rec_mine")
+    past_warmup = c3.toggle(
+        "Only games past the warm-up", value=True, key="rec_warmup",
+        help="Both teams had played 3+ games: the games the model was built and tested for. "
+        "Off includes the season's first weeks, when predictions carry a 'rough guide' "
+        "warning and tend to be overconfident.",
+    )
+    live_only = c2.toggle(
+        "Only predictions logged before the game", key="rec_live",
+        help="Leaves out backfilled games: played before the log existed, so their prediction "
+        "was written afterwards (from games before their date, the same numbers the frozen "
+        "model would have logged).",
+    )
+    team_id = home["team_id"] if only_mine else None
+    summary = cached("prediction_summary", season, team_id, not live_only, past_warmup)
+    if not summary or (summary["games"] == 0 and summary["upcoming_logged"] == 0):
+        st.info(
+            f"Nothing logged for {season} yet. The nightly refresh logs the coming week's "
+            "games; `make predict` logs them now."
+        )
+        return
+
+    n = summary["games"]
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Games graded", n)
+    m2.metric("Picked the winner", "–" if summary["accuracy"] is None else f"{summary['accuracy']:.0%}")
+    if summary["log_loss"] is not None and summary["baseline_log_loss"] is not None:
+        m3.metric(
+            "Log loss", f"{summary['log_loss']:.3f}",
+            delta=f"{summary['log_loss'] - summary['baseline_log_loss']:+.3f} vs home ice only",
+            delta_color="inverse",
+            help="Lower is better. Judges the probabilities, not just the picks. The baseline "
+            "gives every home team the same home edge.",
+        )
+    else:
+        m3.metric("Log loss", "–")
+    m4.metric("Upcoming logged", summary["upcoming_logged"])
+    st.caption(
+        f"{summary['logged_before']} graded games logged before the game, "
+        f"{summary['backfilled']} backfilled. {summary['ties_excluded']} ties left out: the model "
+        "gives the chance of winning a game that has a winner."
+    )
+    if n and n < 100:
+        st.caption(f"Only {n} graded games so far: expect these numbers to move.")
+
+    if summary["calibration"]:
+        st.subheader("Are the probabilities honest?")
+        colors = palette()
+        cal = pd.DataFrame(summary["calibration"])
+        cal["label"] = cal["games"].astype(str) + " g"
+        diag = alt.Chart(pd.DataFrame({"x": [0.5, 1.0], "y": [0.5, 1.0]})).mark_line(
+            color=colors["ref"], strokeDash=[4, 4]
+        ).encode(x="x:Q", y="y:Q")
+        base = alt.Chart(cal).encode(
+            x=alt.X("predicted:Q", title="Favorite's predicted chance",
+                    scale=alt.Scale(domain=[0.5, 1]), axis=alt.Axis(format="%")),
+            y=alt.Y("actual:Q", title="How often the favorite won",
+                    scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
+            tooltip=[alt.Tooltip("predicted:Q", format=".0%", title="Predicted"),
+                     alt.Tooltip("actual:Q", format=".0%", title="Actual"),
+                     alt.Tooltip("games:Q", title="Games")],
+        )
+        points = base.mark_circle(size=90, color=colors["pos"])
+        line = base.mark_line(color=colors["pos"], strokeWidth=2)
+        labels = base.mark_text(dx=14, dy=-8, fontSize=11, color=colors["ref"]).encode(text="label:N")
+        st.altair_chart((diag + line + points + labels).properties(height=280), width="stretch")
+        st.caption(
+            "Games grouped by the favorite's predicted chance. On the dashed line, a 60% "
+            "favorite wins 60% of the time. Small groups bounce around."
+        )
+
+    graded = cached("prediction_log", season, team_id, True, not live_only, past_warmup, 50)
+    if graded:
+        st.subheader("Recent results")
+        mark = {True: "✓", False: "✗", None: "tie"}
+        st.dataframe(
+            pd.DataFrame([
+                {
+                    "Date": pd.Timestamp(r["date"]).strftime("%a %b %-d"),
+                    "Game": matchup_label(r),
+                    "Favorite": r["favorite"]["name"],
+                    "Chance": f"{r['favorite_probability']:.0%}",
+                    "Score": f"{r['away']['name']} {r['away_goals']}, {r['home']['name']} {r['home_goals']}",
+                    "Right?": mark[r["correct"]],
+                    "Logged": "backfilled" if r["backfilled"] else "before the game",
+                }
+                for r in graded
+            ]),
+            hide_index=True,
+            width="stretch",
+        )
+
+    upcoming_rows = cached("prediction_log", season, team_id, False, True, False, 50)
+    if upcoming_rows:
+        st.subheader("Logged for upcoming games")
+        st.dataframe(
+            pd.DataFrame([
+                {
+                    "Date": pd.Timestamp(r["date"]).strftime("%a %b %-d"),
+                    "Game": matchup_label(r),
+                    "Favorite": r["favorite"]["name"],
+                    "Chance": f"{r['favorite_probability']:.0%}",
+                    "Status": "locked" if r["final"] else "updates nightly until game day",
+                }
+                for r in sorted(upcoming_rows, key=lambda r: (str(r["date"]), r["game_id"]))
+            ]),
+            hide_index=True,
+            width="stretch",
+        )
+
+
+
+TOP_N = 20
+
+
+def movement(change: int | None) -> str:
+    if change is None:
+        return "new"
+    if change == 0:
+        return "–"
+    return f"▲ {change}" if change > 0 else f"▼ {-change}"
+
+
+def render_rankings() -> None:
+    """Teams ranked by the win model: chance to beat an average team on neutral ice."""
+    data = cached("rankings", season, as_of)
+    if not data:
+        st.info("Rankings aren't available right now.")
+        return
+    teams = data["teams"]
+    if not teams:
+        st.info(
+            f"No team has played {data['min_games']} D-I games before {as_of:%b %-d} yet. "
+            "Rankings start once teams have that many."
+        )
+        return
+
+    st.caption(
+        f"Who the model says is best right now, from each team's season before "
+        f"{as_of:%b %-d}: the **chance to beat an average D-I team on neutral ice**. Polls "
+        "reward results; this predicts the next game, so a team can rank above or below "
+        "what its record suggests."
+    )
+    top = teams[:TOP_N]
+    colors = palette()
+    table = pd.DataFrame([
+        {"Rank": t["rank"], "Team": t["team"]["name"],
+         "Beats avg team": f"{t['beats_average']:.0%}", "Record": t["record"],
+         "GP": t["games_played"], "Last week": movement(t["change"])}
+        for t in top
+    ])  # fmt: skip
+    mine_rows = [i for i, t in enumerate(top) if t["team"]["team_id"] == home["team_id"]]
+    arrow_css = {"▲": color_text(colors["up"]), "▼": color_text(colors["down"])}
+    st.dataframe(
+        table.style.apply(
+            lambda row: ["font-weight: 700" if row.name in mine_rows else ""] * len(row), axis=1
+        ).map(lambda v: arrow_css.get(str(v)[:1], ""), subset=["Last week"]),
+        hide_index=True,
+        width="stretch",
+        height=36 * (len(top) + 1) + 3,
+    )
+
+    df = pd.DataFrame([
+        {"Rank": t["rank"], "Team": t["team"]["name"], "chance": t["beats_average"],
+         "mine": t["team"]["team_id"] == home["team_id"]}
+        for t in top
+    ])  # fmt: skip
+    order = df["Team"].tolist()
+    bars = (
+        alt.Chart(df)
+        .mark_bar(cornerRadiusEnd=4, height=16)
+        .encode(
+            y=alt.Y("Team:N", sort=order, title=None),
+            x=alt.X("chance:Q", title="Chance to beat an average team on neutral ice",
+                    scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
+            color=alt.condition("datum.mine", alt.value(colors["pos"]), alt.value(colors["ref"])),
+            tooltip=[alt.Tooltip("Rank:Q"), alt.Tooltip("Team:N"),
+                     alt.Tooltip("chance:Q", title="Beats an average team", format=".0%")],
+        )
+    )
+    labels = bars.mark_text(align="left", dx=4, fontSize=11, color=colors["expected"]).encode(
+        text=alt.Text("chance:Q", format=".0%"), color=alt.value(colors["expected"])
+    )
+    even = alt.Chart(pd.DataFrame({"x": [0.5]})).mark_rule(color=colors["ref"], strokeDash=[4, 4]).encode(x="x:Q")
+    st.altair_chart((bars + labels + even).properties(height=24 * len(top) + 20), width="stretch")
+
+    mine = next((t for t in teams if t["team"]["team_id"] == home["team_id"]), None)
+    if mine is None:
+        st.caption(f"**{home_name}** isn't ranked yet (fewer than {data['min_games']} D-I games).")
+    elif mine["rank"] > TOP_N:
+        st.caption(
+            f"**{home_name}**: #{mine['rank']} of {len(teams)}, beats an average team "
+            f"{mine['beats_average']:.0%}, {mine['record']}, {movement(mine['change'])} since last week."
+        )
+    st.caption(
+        f"Model {data['model']}. **Not adjusted for strength of schedule.** Teams need "
+        f"{data['min_games']} D-I games to be ranked ({data['unranked']} aren't yet). "
+        f"\"Last week\" compares with games before {pd.Timestamp(data['compared_to']):%b %-d}. "
+        "Teams a few points apart are close to a coin flip."
+    )
+
+
 # ----------------------------------------------------------------------------
 # Header and tabs
 # ----------------------------------------------------------------------------
 
 st.title(scouted["name"])
 header_caption = st.empty()
-tab_team, tab_players, tab_h2h, tab_win = st.tabs(
-    ["Team", "Players", f"vs {home_name}", "Win probability"]
+tab_team, tab_players, tab_h2h, tab_win, tab_rank, tab_record = st.tabs(
+    ["Team", "Players", f"vs {home_name}", "Win probability", "Rankings", "Model record"]
 )
 with tab_win:
     render_win_probability()
+with tab_rank:
+    render_rankings()
+with tab_record:
+    render_model_record()
 if scout_error:
     with tab_team:
         st.error(scout_error)

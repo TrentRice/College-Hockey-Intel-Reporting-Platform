@@ -55,6 +55,9 @@ latest season.
 | `GET /v1/games/{game_id}` | Full box score: game info and officials, each team's stats by period, skaters, goalies, every goal (time, strength, scorer, assists) and penalty |
 | `GET /v1/games/{game_id}/prediction` | Win probability from model v1: each team's inputs (games played, close-game shot share, goal differential) from games **before** the game's date, the home and away chances, and how much each factor moves them. Works for upcoming and played games. See below |
 | `GET /v1/matchup` | Win probability for **any two D-I teams**, scheduled or not: `home_team_id`, `away_team_id`, `neutral`, `as_of` (games before this date; default today), `season`. Same model and response as a game's prediction, without the game |
+| `GET /v1/rankings` | Every D-I team ranked by win model v1: chance to beat an average team on neutral ice, record, games played, and movement since a week earlier. `as_of` (games before this date), `min_games` (default 5), `limit`. Not adjusted for schedule |
+| `GET /v1/predictions` | The prediction log, newest first: each game's logged chance, the favorite, whether it was backfilled or locked, and the result and whether the favorite won once played. Filters: `season`, `team_id`, `played`, `backfilled`, `reliable_only` (games past the 3-game warm-up). Paged |
+| `GET /v1/predictions/summary` | How the log has done: graded games (ties excluded), accuracy, log loss and Brier score, a home-ice-only baseline, and calibration by the favorite's chance. Same filters |
 | `GET /v1/players` | Player search. `search` matches any spelling and ignores accents ("jeremie" finds "Jérémie"). Filters: `season`, `team_id`, `position`. Paged |
 | `GET /v1/players/{player_id}` | Profile: every spelling, plus each season's team and skater or goalie totals |
 | `GET /v1/players/{player_id}/games` | Game log: opponent, result, and that game's stats. Filter: `season` |

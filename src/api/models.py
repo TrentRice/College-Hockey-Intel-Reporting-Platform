@@ -540,3 +540,77 @@ class GamePrediction(Prediction):
 class MatchupPrediction(Prediction):
     season: str
     neutral_site: bool
+
+
+class LoggedPrediction(BaseModel):
+    game_id: str
+    date: dt.date
+    home: TeamRef
+    away: TeamRef
+    neutral: bool
+    home_win_probability: float
+    favorite: TeamRef = Field(description="The team the model gave the higher chance")
+    favorite_probability: float
+    reliable: bool
+    backfilled: bool = Field(
+        description="Written after the game from games before its date, not logged in advance"
+    )
+    final: bool = Field(description="Locked: written on game day (or backfilled)")
+    logged_at: dt.datetime
+    is_played: bool
+    home_goals: int | None
+    away_goals: int | None
+    result: Literal["home", "away", "tie"] | None = Field(description="None until played")
+    correct: bool | None = Field(description="The favorite won. None for ties and unplayed games")
+
+
+class CalibrationBin(BaseModel):
+    low: float
+    high: float
+    games: int
+    predicted: float = Field(description="Average predicted chance for the favorite")
+    actual: float = Field(description="How often the favorite won")
+
+
+class PredictionSummary(BaseModel):
+    season: str
+    model: str
+    games: int = Field(description="Decided games graded (ties excluded)")
+    logged_before: int = Field(description="Of those, logged before the game")
+    backfilled: int
+    ties_excluded: int
+    upcoming_logged: int
+    correct: int
+    accuracy: float | None
+    log_loss: float | None
+    brier: float | None
+    baseline_log_loss: float | None = Field(
+        description="Home ice only (evenly matched teams: the model's home edge, 50% at a "
+        "neutral site). The model should beat this"
+    )
+    calibration: list[CalibrationBin]
+
+
+class RankedTeam(BaseModel):
+    rank: int
+    team: TeamRef
+    beats_average: float = Field(
+        description="Chance to beat an average ranked team on neutral ice (model v1)"
+    )
+    rating: float = Field(description="Neutral-site strength in log-odds; differences are what matter")
+    record: str = Field(description="W-L-T in D-I games before the date (shootouts are ties)")
+    games_played: int
+    previous_rank: int | None = Field(description="Rank a week earlier; None if not ranked then")
+    change: int | None = Field(description="Places moved up (+) or down (-) since a week earlier")
+    close_shot_share: float = Field(description="Model input, for reference")
+    goal_diff_per_game: float = Field(description="Model input, for reference")
+
+
+class Rankings(BaseModel):
+    season: str
+    model: str
+    as_of: dt.date = Field(description="Uses games before this date")
+    compared_to: dt.date = Field(description="Movement is against games before this date")
+    min_games: int
+    unranked: int = Field(description="D-I teams with fewer than min_games games")
+    teams: list[RankedTeam]

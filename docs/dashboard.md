@@ -78,6 +78,39 @@ save. Stop the Docker one first (`docker compose stop dashboard`), because both 
   warm-up.
 - **No prediction** for a game against a non-D-I team or a TBD opponent. The tab says why.
 
+**Rankings tab**: the top 20 teams by the win model, like a poll.
+- **The ranking:** each team's **chance to beat an average D-I team on neutral ice**, from
+  its season before the sidebar's "Only games before" date.
+- **The view:** a bar chart and a table (rank, team, chance, record, games played, and
+  movement since a week earlier: ▲ green, ▼ red, "new").
+- **Your team** is highlighted, and listed below the table if it's outside the top 20.
+- **How it differs from a poll:**
+  - Polls reward results. This predicts the next game, so a team can rank well above or
+    below its record. The gaps point to over- and underachievers.
+  - The ordering agrees with every neutral-site prediction on the Win probability tab.
+- **Limits:**
+  - **Not adjusted for strength of schedule.**
+  - Teams need 5 D-I games to be ranked, since shot share means little before that. So the
+    tab is empty for the first weeks of a season.
+  - Teams a few points apart are close to a coin flip.
+
+**Model record tab**: how the win model's predictions have held up.
+- **What it shows:**
+  - games graded, how often the favorite won, and log loss against a home-ice-only baseline
+    (lower is better);
+  - a **calibration** chart: do 60% favorites win about 60% of the time?
+  - recent results, with ✓/✗ for whether the favorite won;
+  - the predictions already logged for the coming week.
+- **Toggles:**
+  - **Only your team's games.**
+  - **Only predictions logged before the game.** Leaves out games backfilled when the log
+    started.
+  - **Only games past the warm-up** (on by default). Both teams had played 3+ games, the
+    games the model was built and tested for. Turn it off to include the season's first
+    weeks, when predictions carry a "rough guide" warning.
+- **Where the numbers come from:** the nightly refresh logs each game's chance and locks it on
+  game day (see [pipeline.md](pipeline.md)).
+
 **Sorting.** Click a column header to sort, and click again to reverse. The difference
 columns hold real numbers, so ascending puts the biggest drop first and descending the biggest
 gain first. In the team table the rows mix units (percentage points and per-game numbers), so
@@ -86,7 +119,7 @@ sorting there groups by size rather than comparing like with like.
 ## How it fits together
 
 The dashboard reads **only from the API** (`/v1/teams/{id}/form`, `/player-form`,
-`/games`, `/v1/games/{id}/prediction`, `/v1/matchup`, `/health`) with your `API_KEY`. It never connects to
+`/games`, `/v1/games/{id}/prediction`, `/v1/matchup`, `/v1/rankings`, `/v1/predictions`, `/health`) with your `API_KEY`. It never connects to
 the database. Responses are
 cached for 5 minutes, and the sidebar shows when the data was last refreshed. If the latest
 nightly refresh failed or was blocked, it shows a warning.

@@ -75,6 +75,8 @@ def default_steps(report_path: Path) -> list[Step]:
         ),
         Step("ids", [*py, "src.transform.id_mapping"]),
         Step("load", [*py, "src.db.load"]),
+        # after the load: log win probabilities for the coming week (db/predictions.sql)
+        Step("predict", [*py, "src.pipeline.predict"]),
     ]
 
 

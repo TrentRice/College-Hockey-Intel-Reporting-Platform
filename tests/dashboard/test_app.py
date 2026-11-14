@@ -108,3 +108,53 @@ def test_win_probability_any_team_is_a_matchup(app):
     no_errors(app)
     away_pct = int({m.label: m.value for m in app.metric}["Home U win"].rstrip("%"))
     assert away_pct < home_pct  # losing home ice lowers the chance
+
+
+def test_model_record_tab(app, database_url):
+    import datetime as dt
+
+    import psycopg
+
+    from src.pipeline.predict import log_predictions
+
+    # Nothing logged yet: a clear message
+    assert any("Nothing logged" in i.value for i in app.info)
+    try:
+        with psycopg.connect(database_url) as conn:
+            conn.execute("DROP SCHEMA IF EXISTS predictions CASCADE")
+        log_predictions(database_url, today=dt.date(2026, 10, 15))  # backfills g1 and g2
+        st.cache_data.clear()
+        app.run()
+        no_errors(app)
+        # g1 and g2 are both teams' first games: below the warm-up, hidden by default
+        assert next(t for t in app.toggle if t.label == "Only games past the warm-up").value is True
+        next(t for t in app.toggle if t.label == "Only games past the warm-up").set_value(False).run()
+        no_errors(app)
+        values = {m.label: m.value for m in app.metric}
+        assert values["Games graded"] == "1"  # g2 was a tie
+        assert values["Picked the winner"] == "100%"
+        frames = [df.value for df in app.dataframe]
+        assert any("Right?" in getattr(f, "columns", []) for f in frames)
+    finally:
+        with psycopg.connect(database_url) as conn:
+            conn.execute("DROP SCHEMA IF EXISTS predictions CASCADE")
+
+
+def test_rankings_tab_waits_for_enough_games(app):
+    # Fixture teams have played 2 games at most: below the 5-game minimum
+    no_errors(app)
+    assert any("Rankings start once" in i.value for i in app.info)
+
+
+def test_rankings_tab(app, monkeypatch):
+    # Rank with a 1-game minimum so the fixture's two D-I teams qualify
+    real = dashboard_client.rankings
+    monkeypatch.setattr(dashboard_client, "rankings", lambda season, as_of, min_games=None: real(season, as_of, 1))
+    app.sidebar.radio[0].set_value("Any team").run()
+    st.cache_data.clear()
+    app.run()
+    no_errors(app)
+    frames = [df.value for df in app.dataframe]
+    ranked = next(f for f in frames if "Beats avg team" in getattr(f, "columns", []))
+    data = getattr(ranked, "data", ranked)
+    assert list(data["Team"]) == ["Home U", "Rival College"]

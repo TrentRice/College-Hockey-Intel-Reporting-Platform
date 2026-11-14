@@ -4,8 +4,8 @@ Keeps the database current during the season with no manual steps. Code:
 [src/pipeline/](../src/pipeline/).
 
 ```
-schedules ─► box scores ─► parse ─► validate ─► ids ─► load
- (scrape)    (new only)            (gate)              (one transaction)
+schedules ─► box scores ─► parse ─► validate ─► ids ─► load ─► predict
+ (scrape)    (new only)            (gate)              (one transaction) (log the week)
 ```
 
 | Step | Runs | Notes |
@@ -16,6 +16,7 @@ schedules ─► box scores ─► parse ─► validate ─► ids ─► load
 | validate | `validate_chn_data --strict` | **Gate.** An unexplained mismatch stops the run before the load. |
 | ids | `id_mapping` | Reuses existing ids |
 | load | `src.db.load` | Full refresh in one transaction |
+| predict | `src.pipeline.predict` | Logs win model v1's chance for every D-I game in the next 7 days, in `predictions.game_predictions`. Each night updates a game's prediction until game day; the game-day run locks it. Played games not yet logged are backfilled and marked so. Also `make predict` |
 
 ## Running it
 

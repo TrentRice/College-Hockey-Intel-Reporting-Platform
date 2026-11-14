@@ -1,4 +1,4 @@
-.PHONY: setup lint format test up api-up down logs refresh runs dashboard train serve clean validate ids db-up db-down db-reset load psql
+.PHONY: setup lint format test up api-up down logs refresh predict runs dashboard train serve clean validate ids db-up db-down db-reset load psql
 
 # Install dependencies
 setup:
@@ -67,6 +67,10 @@ psql:
 # Refresh the data now: scrape, download, parse, validate, ids, load (also runs nightly in Docker)
 refresh:
 	uv run python -m src.pipeline.refresh
+
+# Log win probabilities for the coming week (the nightly refresh does this after the load)
+predict:
+	uv run python -m src.pipeline.predict
 
 # Recent refresh runs
 runs:

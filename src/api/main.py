@@ -20,7 +20,7 @@ from psycopg_pool import PoolTimeout
 
 from config.settings import settings
 from src.api.db import make_pool
-from src.api.routers import games, leaders, meta, players, teams
+from src.api.routers import games, leaders, meta, players, predictions, rankings, teams
 from src.api.security import require_api_key
 from src.models.win_model import ModelUnavailable, load_card
 
@@ -65,7 +65,10 @@ def create_app(database_url: str | None = None, api_key: str | None = None) -> F
     v1 = [Depends(require_api_key)]
     app.include_router(meta.health_router)
     app.include_router(meta.router, prefix="/v1", dependencies=v1)
-    for r in (teams.router, games.router, games.matchup_router, players.router, leaders.router):
+    for r in (
+        teams.router, games.router, games.matchup_router, predictions.router,
+        rankings.router, players.router, leaders.router,
+    ):
         app.include_router(r, prefix="/v1", dependencies=v1)
     return app
 
