@@ -1,4 +1,4 @@
-.PHONY: setup lint format test up api-up down logs refresh predict backup restore-predictions runs dashboard serve clean validate ids db-up db-down db-reset load psql
+.PHONY: setup lint format test up api-up down logs prod-up prod-down prod-logs prod-refresh prod-restore prod-runs refresh predict backup restore-predictions runs dashboard serve clean validate ids db-up db-down db-reset load psql
 
 # First-time setup: install every dependency group, and strip notebook outputs from git
 # (CHN data must never be committed; nbstripout's filter lives in .git/config, so a fresh
@@ -31,6 +31,29 @@ down:
 # Tail logs from the stack
 logs:
 	docker compose logs -f
+
+# --- Public server (docs/deploy.md): the same stack plus Caddy for HTTPS ---------------
+PROD = docker compose -f docker-compose.yml -f docker-compose.prod.yml
+
+# Start or update the server's stack (after `git pull`)
+prod-up:
+	$(PROD) up -d --build --wait
+
+prod-down:
+	$(PROD) down
+
+prod-logs:
+	$(PROD) logs -f
+
+# Refresh the data now, inside the pipeline container (the server has no uv)
+prod-refresh:
+	$(PROD) exec pipeline python -m src.pipeline.refresh
+
+# Restore the prediction log from the newest backup in data/backups/
+prod-restore:
+	$(PROD) exec pipeline python -m src.pipeline.backup --restore
+
+prod-runs: runs
 
 # Run data ingestion
 ingest:

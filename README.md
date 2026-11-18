@@ -1,6 +1,6 @@
 # CHIRP
 
-**College Hockey Intelligence & Reporting Platform.** A private, self-updating platform for
+**College Hockey Intelligence & Reporting Platform.** A self-updating platform for
 D-I men's college hockey. It has a database of every game, box score and player, an API, a
 scouting dashboard, and a win-probability model that's tested against real results. It was
 built for scouting Boston University's opponents.
@@ -9,7 +9,8 @@ built for scouting Boston University's opponents.
 
 ## What it does
 
-The dashboard at http://127.0.0.1:8501 has six tabs:
+The dashboard (public on a free Oracle Cloud server, [docs/deploy.md](docs/deploy.md); locally
+at http://127.0.0.1:8501) has six tabs:
 
 | Tab | What it shows |
 |---|---|
@@ -64,6 +65,7 @@ College Hockey News ─► scrape ─► parse ─► validate ─► ids ─►
 
 Details: [architecture](docs/architecture.md) · [database](docs/schema.md) ·
 [pipeline](docs/pipeline.md) · [API](docs/api.md) · [dashboard](docs/dashboard.md) ·
+[deploy](docs/deploy.md) ·
 [form features](docs/features.md) · [data validation](docs/data_validation.md)
 
 ## The win model
@@ -97,8 +99,9 @@ The data comes from [College Hockey News](https://www.collegehockeynews.com), wh
 allow **personal, non-commercial use only**. So:
 - **None of it is in this repo:** scraped pages, CSVs, backups, logs and notebook outputs are
   all gitignored or stripped.
-- **Everything runs on one machine:** every port is bound to 127.0.0.1, the API needs a key,
-  and the scrapers respect robots.txt.
+- **Only the dashboard is public,** with CHN's permission. It runs on one server behind
+  Caddy ([docs/deploy.md](docs/deploy.md)). The API and database stay on 127.0.0.1, the API
+  needs a key, and the scrapers respect robots.txt.
 - **Only 2025-26 onward is kept** (see [docs/schema.md](docs/schema.md#data-source-and-use)).
 
 ## Tech stack

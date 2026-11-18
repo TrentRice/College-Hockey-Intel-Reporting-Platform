@@ -3,7 +3,8 @@
 # image, built from one Dockerfile (targets api, pipeline, dashboard).
 #
 # PRIVATE BY DESIGN. College Hockey News allows personal use only, so every published port
-# is bound to 127.0.0.1: reachable from this machine, refused from any network. Never change
+# is bound to 127.0.0.1: reachable from this machine, refused from any network. The public
+# server adds Caddy for the dashboard only (docker-compose.prod.yml, docs/deploy.md). Never change
 # a port to the "8000:8000" form (that listens on every network, and Docker bypasses the Mac
 # firewall), and never use network_mode: host.
 services:

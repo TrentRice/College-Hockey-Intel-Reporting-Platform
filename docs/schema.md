@@ -150,3 +150,7 @@ What this means for the project: building the database and API for personal, non
 analysis is the use the terms allow. Publishing the dataset or a public API built from it
 needs written permission from CHN (contact: public@collegehockeynews.com). The schema and
 code can be shared freely; the data can't, which is why `data/` is gitignored.
+
+**Public dashboard:** CHN gave permission for the dashboard to be public
+([deploy.md](deploy.md)); keep that written permission on file. The permission covers the
+dashboard only: the API, the database and the raw data stay private.

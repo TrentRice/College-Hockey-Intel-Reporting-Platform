@@ -133,9 +133,11 @@ nightly refresh failed or was blocked, it shows a warning.
 
 ## Privacy
 
-- **Localhost only.** Docker publishes it on `127.0.0.1:8501`, and `.streamlit/config.toml`
-  sets `127.0.0.1` for local runs. Tested: connections from this Mac's network address are
-  refused.
+- **Public only through Caddy.** On the public server, Caddy serves the dashboard over HTTPS
+  ([deploy.md](deploy.md)), with College Hockey News's permission. It has no login, so
+  everything on it is visible to anyone. The dashboard's own port is still `127.0.0.1:8501`
+  on both the Mac and the server, and `.streamlit/config.toml` sets `127.0.0.1` for local
+  runs, so nothing reaches Streamlit except through Caddy.
 - **No usage statistics.** Streamlit normally sends anonymous usage data. It's turned off
   in `.streamlit/config.toml` and again in the container's environment.
 - The container is set up like the others: a non-root user, a read-only filesystem, and all

@@ -30,6 +30,8 @@ and loads it. **The data never goes in git** (College Hockey News: personal use 
 | `make test` | All tests (needs `make db-up`; they use a separate made-up test database) |
 | `make lint` / `make format` | Ruff |
 
+The public server has its own `make prod-*` commands; see [docs/deploy.md](docs/deploy.md).
+
 ## Things that matter
 
 - **Notebooks:** analysis and model building live in `notebooks/`, numbered in order. Their

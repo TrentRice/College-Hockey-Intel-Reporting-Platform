@@ -1,7 +1,9 @@
 # Architecture
 
-How CHIRP fits together. Everything runs on one Mac, and every port listens on 127.0.0.1
-only, because College Hockey News allows personal, non-commercial use only.
+How CHIRP fits together. The whole stack runs on one machine: the Mac for development, and
+a free Oracle Cloud server for the public site ([deploy.md](deploy.md)). Every port listens
+on 127.0.0.1 only, except on the server, where Caddy serves the dashboard publicly over HTTPS
+(with College Hockey News's permission).
 
 ```
 College Hockey News (schedules, box scores)
@@ -19,6 +21,9 @@ data/raw, data/processed (CSV)      Postgres  hockey   predictions  data/backups
                                         │
                                         ▼
                                    Dashboard (Streamlit)  ──────────────  127.0.0.1:8501
+                                        │  server only
+                                        ▼
+                                   Caddy (HTTPS)  ─────────────────────  public :443
 ```
 
 ## Pieces
