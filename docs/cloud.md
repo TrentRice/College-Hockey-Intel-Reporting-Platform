@@ -131,7 +131,7 @@ The local Docker stack's `pipeline` service is off by default (a Compose profile
 |---|---|
 | See recent refreshes | Data repo → **Actions** (or `pipeline_runs.csv`) |
 | Refresh now | Data repo → **Actions → Nightly refresh → Run workflow** |
-| Deploy code changes | Push to `main`; Streamlit Cloud redeploys the app on its own |
+| Deploy code changes | Push to `main`. Streamlit Cloud pulls the new files into the running app, and the app notices CHIRP's code changed and restarts its backend on the next page view (a few seconds). If a page still shows an error after a push, use **Reboot app** |
 | Change dependencies | `uv add …`, then `make cloud-requirements` and commit `cloud/requirements.txt` |
 | Change the nightly workflow | Edit `deploy/data-repo/.github/workflows/refresh.yml`, copy it into the data repo, push both |
 | Restart the app | share.streamlit.io → the app's **⋮** menu → **Reboot app** |

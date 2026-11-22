@@ -195,8 +195,8 @@ def start_postgres(work: Path) -> str:
     return f"postgresql://{PG_USER}@127.0.0.1:{port}/{PG_DB}"
 
 
-def start_api(database_url: str, api_key: str) -> int:
-    """The CHIRP API on 127.0.0.1 in a background thread. Returns its port."""
+def start_api(database_url: str, api_key: str) -> tuple[int, uvicorn.Server]:
+    """The CHIRP API on 127.0.0.1 in a background thread. Returns its port and server."""
     from src.api.main import create_app
 
     port = free_port()
@@ -210,7 +210,14 @@ def start_api(database_url: str, api_key: str) -> int:
         if time.monotonic() > deadline:
             raise RuntimeError("The API didn't start within 60 seconds.")
         time.sleep(0.1)
-    return port
+    return port, server
+
+
+def stop_postgres(work: Path) -> None:
+    pgdata = work / "pgdata"
+    if pgdata.exists():
+        subprocess.run([pg_bin_dir() / "pg_ctl", "-D", pgdata, "stop", "-m", "fast"],
+                       capture_output=True, check=False)
 
 
 # ----------------------------------------------------------------------------
@@ -238,6 +245,7 @@ class Backend:
     checked_at: float = 0.0
     error: str | None = None  # the last failed reload, shown nowhere public; see the logs
     _lock: threading.Lock = field(default_factory=threading.Lock)
+    _api: uvicorn.Server | None = None
 
     @classmethod
     def start(cls, repo: str | None = None, token: str | None = None) -> Backend:
@@ -256,11 +264,18 @@ class Backend:
         # The dashboard reads the key from settings and the address from CHIRP_API_URL
         key = secrets.token_urlsafe(32)
         settings.api_key = key
-        backend.api_url = f"http://127.0.0.1:{start_api(database_url, key)}"
+        port, backend._api = start_api(database_url, key)
+        backend.api_url = f"http://127.0.0.1:{port}"
         os.environ["CHIRP_API_URL"] = backend.api_url
         log.warning("CHIRP backend ready in %.0fs (data %s)", time.monotonic() - started,
                     backend.version)
         return backend
+
+    def stop(self) -> None:
+        """Shut down the API and Postgres (before starting a backend on newer code)."""
+        if self._api is not None:
+            self._api.should_exit = True
+        stop_postgres(WORK_DIR)
 
     def reload(self, version: str) -> None:
         dest = WORK_DIR / f"data-{int(time.time() * 1000)}"
