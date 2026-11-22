@@ -1,5 +1,7 @@
 # The public site (free): Streamlit Community Cloud + GitHub
 
+**Live at [chirp-hockey.streamlit.app](https://chirp-hockey.streamlit.app).**
+
 CHIRP's public dashboard runs for free on **Streamlit Community Cloud**. The data lives in a
 **private GitHub repo** (`CHIRP-data`), and a **GitHub Actions** job in that repo refreshes it
 every morning. No server, and the Mac doesn't need to be on.

@@ -5,8 +5,8 @@ their **season so far**. Code: [src/dashboard/](../src/dashboard/).
 
 ## Opening it
 
-**The public site** is on Streamlit Community Cloud, at the `streamlit.app` address chosen when
-it was deployed ([cloud.md](cloud.md)).
+**The public site:** [chirp-hockey.streamlit.app](https://chirp-hockey.streamlit.app), on
+Streamlit Community Cloud ([cloud.md](cloud.md)).
 
 **Locally:**
 ```

@@ -5,12 +5,15 @@ D-I men's college hockey. It has a database of every game, box score and player,
 scouting dashboard, and a win-probability model that's tested against real results. It was
 built for scouting Boston University's opponents.
 
+**Live site: [chirp-hockey.streamlit.app](https://chirp-hockey.streamlit.app)**, updated
+every morning.
+
 [![CI](https://github.com/TrentRice/College-Hockey-Intel-Reporting-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/TrentRice/College-Hockey-Intel-Reporting-Platform/actions/workflows/ci.yml)
 
 ## What it does
 
-The dashboard (public for free on Streamlit Community Cloud, [docs/cloud.md](docs/cloud.md);
-locally at http://127.0.0.1:8501) has six tabs:
+The dashboard ([chirp-hockey.streamlit.app](https://chirp-hockey.streamlit.app), or
+http://127.0.0.1:8501 locally) has seven tabs:
 
 | Tab | What it shows |
 |---|---|
@@ -20,19 +23,23 @@ locally at http://127.0.0.1:8501) has six tabs:
 | **Win probability** | Your team's chance against the next opponent, or any team at a venue you pick, with what drives it |
 | **Rankings** | A model "poll": the top 20 by chance to beat an average team on neutral ice, with movement since last week |
 | **Model record** | Every prediction, logged before the game and checked against the result: accuracy, log loss, calibration |
+| **Acknowledgments** | Credit to College Hockey News for the data, and the terms it's used under |
 
 It defaults to BU and its next opponent. The sidebar picks your team, the team to scout, a
 cut-off date ("only games before"), and how many recent games to look at.
 
 ## Where it runs
 
-- **The public site:** Streamlit Community Cloud, free. The data lives in a private GitHub
-  repo, `CHIRP-data`, and GitHub Actions refreshes it every morning. Nothing runs on the Mac.
-  Setup and upkeep: [docs/cloud.md](docs/cloud.md).
+- **The public site,
+  [chirp-hockey.streamlit.app](https://chirp-hockey.streamlit.app):** Streamlit Community
+  Cloud, free. The data lives in a private GitHub repo, `CHIRP-data`, and GitHub Actions
+  refreshes it every morning. Nothing runs on the Mac. Setup and upkeep:
+  [docs/cloud.md](docs/cloud.md).
 - **Local development:** the same database, API and dashboard in Docker on the Mac, on
   127.0.0.1 only:
 
 ```bash
+git clone https://github.com/TrentRice/CHIRP-data.git ../CHIRP-data   # the private data
 cp .env.example .env     # set API_KEY
 make setup               # dependencies, plus notebook output stripping
 make up                  # Postgres, API and dashboard (Docker)
@@ -73,7 +80,8 @@ and dashboard inside the app ([docs/cloud.md](docs/cloud.md)).
   - Backs up the prediction log, and commits everything to the private data repo only if
     validation passed.
 - **Public app:** Streamlit Community Cloud, with the data pulled from the private repo with a
-  read-only token. Only the dashboard page is public.
+  read-only token. Only the dashboard page is public. An idle app naps after 12 hours, and
+  the next visitor wakes it in about a minute.
 - **Docker (local development):** three small images from one Dockerfile (api, pipeline,
   dashboard), each with only its own dependencies.
 
@@ -136,10 +144,10 @@ src/
   pipeline/    nightly refresh, prediction log, backups
   cloud/       the public site: nightly job, in-app Postgres + API
 cloud/         Streamlit Community Cloud entry point and its requirements
-deploy/        the private data repo's workflow and README (source of truth)
+deploy/        the private data repo's workflow and README (source of truth), and its setup script
 db/            schema, feature views, prediction log
 notebooks/     EDA (01-08) and the frozen model (09)
 models/        model cards (the fitted .joblib files stay local)
 docs/          design and how-to docs
-tests/         unit, API, pipeline and dashboard tests (made-up data only)
+tests/         unit, API, pipeline, dashboard and cloud tests (made-up data only)
 ```

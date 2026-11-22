@@ -607,10 +607,10 @@ its probabilities and rankings, and the prediction log. Any errors in those are 
 CHN's.
 
 **How the data is used**
-- **Personal, non-commercial use only,** as CHN's terms allow. CHIRP is a private scouting
-  tool: it runs on one computer, isn't published, and isn't shared.
-- **No redistribution.** None of the data is in the project's code repository, and the
-  data, API and site stay private.
+- **Non-commercial.** CHIRP is a free personal project, and this dashboard is public with
+  CHN's permission.
+- **No redistribution.** The dashboard shows the data; it doesn't publish it. None of it is
+  in the project's public code repository, and the underlying data and API stay private.
 - **Polite collection.** CHN's robots.txt is respected, pages are saved so they're fetched
   only once, and the refresh runs once a day.
 - **Only the 2025-26 season onward is kept.**
