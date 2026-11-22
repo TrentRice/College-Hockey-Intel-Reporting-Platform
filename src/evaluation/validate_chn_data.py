@@ -769,9 +769,9 @@ def main() -> None:
     approx = approximate_checks(data)
     write_report(root, tags, data, exact, approx, report_path=args.report)
 
-    failures = pd.concat(
-        [c.failures.assign(check=c.name) for c in exact if len(c.failures)], ignore_index=True
-    )
+    found = [c.failures.assign(check=c.name) for c in exact if len(c.failures)]
+    # nothing to list is the best case, not an error (pd.concat refuses an empty list)
+    failures = pd.concat(found, ignore_index=True) if found else pd.DataFrame()
     out = root / FAILURES_PATH
     out.parent.mkdir(parents=True, exist_ok=True)
     failures.reindex(columns=["check", "game_id", "team", "detail", "cause"]).to_csv(
