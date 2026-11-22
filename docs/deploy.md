@@ -1,6 +1,12 @@
-# Deploying the public site
+# Self-hosting the public site (alternative)
 
-CHIRP's dashboard runs publicly on a free Oracle Cloud server, at a free DuckDNS address
+> **The public site runs on Streamlit Community Cloud now ([cloud.md](cloud.md)).** This page is
+> the alternative: the full Docker stack on your own server. It was written for Oracle Cloud's
+> free tier, whose free servers were rarely available. The same steps work on any Ubuntu
+> server, such as a ~$5/month Hetzner or DigitalOcean one; skip steps 1–3 and open ports
+> 80 and 443 in that provider's firewall.
+
+This setup runs CHIRP's dashboard publicly on a free Oracle Cloud server, at a free DuckDNS address
 over HTTPS. The server runs the same Docker stack as the Mac, plus **Caddy**, which is the
 only thing the internet can reach:
 

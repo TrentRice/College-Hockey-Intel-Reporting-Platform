@@ -97,8 +97,9 @@ a badly formed parameter (for example `season=2026`).
 
 College Hockey News allows personal, non-commercial use of its data only (see
 [schema.md](schema.md#data-source-and-use)). CHN's permission covers the public dashboard,
-not the API, so the API must never be reachable by anyone else, on the Mac or on the public
-server ([deploy.md](deploy.md)). There are four layers:
+not the API, so the API must never be reachable by anyone else, on the Mac or in the public
+Streamlit app ([cloud.md](cloud.md)), where it runs on `127.0.0.1` inside the app with a
+random key. There are four layers:
 
 1. **Localhost only.** Docker publishes the API on `127.0.0.1:8000` and the database on
    `127.0.0.1:5432`, and `make serve` binds to `127.0.0.1`. Nothing off this machine can
@@ -117,8 +118,8 @@ server ([deploy.md](deploy.md)). There are four layers:
    no endpoint can change data.
 
 Never publish the API's or database's port without `127.0.0.1:` or use `network_mode: host`,
-forward the port (router, ngrok, Cloudflare Tunnel, VS Code port forwarding), or point Caddy
-at it. Only the dashboard is public. To reach it from your
+forward the port (router, ngrok, Cloudflare Tunnel, VS Code port forwarding), or point a
+proxy at it. Only the dashboard is public. To reach it from your
 own devices, use a private network such as Tailscale, together with the key.
 
 ## Tests

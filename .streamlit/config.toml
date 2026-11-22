@@ -1,6 +1,8 @@
 # Streamlit settings for the CHIRP dashboard.
+# No server.address here: Streamlit Community Cloud must listen on its own network (docs/cloud.md).
+# Locally, `make dashboard` passes --server.address 127.0.0.1 (this machine only), and the
+# Docker service publishes its port on 127.0.0.1.
 [server]
-address = "127.0.0.1"   # this machine only (the Docker service overrides this inside its container)
 port = 8501
 headless = true
 

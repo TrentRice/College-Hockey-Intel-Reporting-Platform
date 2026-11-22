@@ -12,7 +12,8 @@ make up                  # Postgres, API, nightly pipeline and dashboard in Dock
 ```
 
 The database starts empty. The first `make refresh`, or the first nightly run, scrapes CHN
-and loads it. **The data never goes in git** (College Hockey News: personal use only).
+and loads it. **The data never goes in this repo** (College Hockey News: personal use only).
+The public site's copy lives in the private `CHIRP-data` repo ([docs/cloud.md](docs/cloud.md)).
 
 ## Day to day
 
@@ -30,7 +31,9 @@ and loads it. **The data never goes in git** (College Hockey News: personal use 
 | `make test` | All tests (needs `make db-up`; they use a separate made-up test database) |
 | `make lint` / `make format` | Ruff |
 
-The public server has its own `make prod-*` commands; see [docs/deploy.md](docs/deploy.md).
+The public site (Streamlit Community Cloud, nightly refresh in GitHub Actions) is in
+[docs/cloud.md](docs/cloud.md). `make prod-*` is for the self-hosted alternative,
+[docs/deploy.md](docs/deploy.md).
 
 ## Things that matter
 

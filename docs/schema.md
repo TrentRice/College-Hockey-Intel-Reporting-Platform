@@ -152,5 +152,6 @@ needs written permission from CHN (contact: public@collegehockeynews.com). The s
 code can be shared freely; the data can't, which is why `data/` is gitignored.
 
 **Public dashboard:** CHN gave permission for the dashboard to be public
-([deploy.md](deploy.md)); keep that written permission on file. The permission covers the
-dashboard only: the API, the database and the raw data stay private.
+([cloud.md](cloud.md)); keep that written permission on file. The permission covers the
+dashboard only: the API, the database and the data stay private. The public site's data lives
+in a private GitHub repo, never in this one.

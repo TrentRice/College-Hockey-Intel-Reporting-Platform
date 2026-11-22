@@ -9,8 +9,8 @@ built for scouting Boston University's opponents.
 
 ## What it does
 
-The dashboard (public on a free Oracle Cloud server, [docs/deploy.md](docs/deploy.md); locally
-at http://127.0.0.1:8501) has six tabs:
+The dashboard (public for free on Streamlit Community Cloud, [docs/cloud.md](docs/cloud.md);
+locally at http://127.0.0.1:8501) has six tabs:
 
 | Tab | What it shows |
 |---|---|
@@ -65,7 +65,7 @@ College Hockey News ─► scrape ─► parse ─► validate ─► ids ─►
 
 Details: [architecture](docs/architecture.md) · [database](docs/schema.md) ·
 [pipeline](docs/pipeline.md) · [API](docs/api.md) · [dashboard](docs/dashboard.md) ·
-[deploy](docs/deploy.md) ·
+[public site](docs/cloud.md) ·
 [form features](docs/features.md) · [data validation](docs/data_validation.md)
 
 ## The win model
@@ -98,10 +98,11 @@ opening night. It's planned for 2027-28, once 2026-27 is complete (plan in
 The data comes from [College Hockey News](https://www.collegehockeynews.com), whose terms
 allow **personal, non-commercial use only**. So:
 - **None of it is in this repo:** scraped pages, CSVs, backups, logs and notebook outputs are
-  all gitignored or stripped.
-- **Only the dashboard is public,** with CHN's permission. It runs on one server behind
-  Caddy ([docs/deploy.md](docs/deploy.md)). The API and database stay on 127.0.0.1, the API
-  needs a key, and the scrapers respect robots.txt.
+  all gitignored or stripped. The public site's data lives in a separate **private** repo,
+  refreshed nightly by GitHub Actions ([docs/cloud.md](docs/cloud.md)).
+- **Only the dashboard is public,** with CHN's permission. The API and database run privately
+  on 127.0.0.1 (on the Mac, or inside the Streamlit app), the API needs a key, and the scrapers
+  respect robots.txt.
 - **Only 2025-26 onward is kept** (see [docs/schema.md](docs/schema.md#data-source-and-use)).
 
 ## Tech stack

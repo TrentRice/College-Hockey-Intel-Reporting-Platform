@@ -55,3 +55,19 @@ def test_nothing_to_back_up_before_the_first_log(database_url, tmp_path):
         conn.execute("DROP SCHEMA IF EXISTS predictions CASCADE")
     assert backup_predictions(database_url, tmp_path) == (None, 0)
     assert backups(tmp_path) == []
+
+
+def test_restore_with_replace_makes_the_log_exactly_the_backup(logged, tmp_path):
+    before = table(logged)
+    path, _ = backup_predictions(logged, tmp_path)
+    with psycopg.connect(logged) as conn:  # a changed row and an extra one, both to be undone
+        conn.execute("UPDATE predictions.game_predictions SET home_win_probability = 0.42")
+        conn.execute(
+            "INSERT INTO predictions.game_predictions SELECT 'extra', model, season, game_date, "
+            "home_team_id, away_team_id, neutral, home_win_probability, home_games_played, "
+            "away_games_played, home_close_shot_share, away_close_shot_share, "
+            "home_goal_diff_per_game, away_goal_diff_per_game, reliable, backfilled, logged_on, "
+            "first_logged_at, updated_at FROM predictions.game_predictions LIMIT 1"
+        )
+    assert restore_predictions(logged, path, replace=True) == (2, 2)
+    assert table(logged) == before

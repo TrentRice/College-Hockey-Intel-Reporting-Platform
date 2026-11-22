@@ -1,4 +1,4 @@
-.PHONY: setup lint format test up api-up down logs prod-up prod-down prod-logs prod-refresh prod-restore prod-runs refresh predict backup restore-predictions runs dashboard serve clean validate ids db-up db-down db-reset load psql
+.PHONY: cloud-requirements data-repo setup lint format test up api-up down logs prod-up prod-down prod-logs prod-refresh prod-restore prod-runs refresh predict backup restore-predictions runs dashboard serve clean validate ids db-up db-down db-reset load psql
 
 # First-time setup: install every dependency group, and strip notebook outputs from git
 # (CHN data must never be committed; nbstripout's filter lives in .git/config, so a fresh
@@ -54,6 +54,18 @@ prod-restore:
 	$(PROD) exec pipeline python -m src.pipeline.backup --restore
 
 prod-runs: runs
+
+# --- Streamlit Community Cloud (docs/cloud.md) ---------------------------------------------
+# Regenerate cloud/requirements.txt after changing dependencies (Streamlit Cloud installs it)
+cloud-requirements:
+	{ echo "# Streamlit Community Cloud dependencies (docs/cloud.md): the api, dashboard and cloud"; \
+	  echo "# groups. Generated from uv.lock by \`make cloud-requirements\`; don't edit by hand."; \
+	  uv export --locked --no-default-groups --group api --group dashboard --group cloud \
+	    --no-hashes --no-header --no-annotate --no-emit-project; } > cloud/requirements.txt
+
+# Build the private data repo's first version from data/ (docs/cloud.md, step 1)
+data-repo:
+	deploy/make-data-repo.sh ../CHIRP-data
 
 # Run data ingestion
 ingest:
@@ -116,7 +128,7 @@ runs:
 # Run the dashboard outside Docker (reloads on save): http://127.0.0.1:8501
 # Stop the Docker one first (`docker compose stop dashboard`): both use port 8501
 dashboard:
-	uv run python -m streamlit run src/dashboard/app.py
+	uv run python -m streamlit run src/dashboard/app.py --server.address 127.0.0.1
 
 # Build features
 features:

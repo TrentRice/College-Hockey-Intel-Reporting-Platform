@@ -1,9 +1,10 @@
 # Architecture
 
-How CHIRP fits together. The whole stack runs on one machine: the Mac for development, and
-a free Oracle Cloud server for the public site ([deploy.md](deploy.md)). Every port listens
-on 127.0.0.1 only, except on the server, where Caddy serves the dashboard publicly over HTTPS
-(with College Hockey News's permission).
+How CHIRP fits together. On the Mac, the whole stack runs in Docker, and every port listens
+on 127.0.0.1 only. The public site runs the same code for free ([cloud.md](cloud.md)): the
+nightly refresh in GitHub Actions in a private data repo, and the database, API and dashboard
+inside one Streamlit Community Cloud app, where only the dashboard page is public (with
+College Hockey News's permission).
 
 ```
 College Hockey News (schedules, box scores)
@@ -21,9 +22,14 @@ data/raw, data/processed (CSV)      Postgres  hockey   predictions  data/backups
                                         │
                                         ▼
                                    Dashboard (Streamlit)  ──────────────  127.0.0.1:8501
-                                        │  server only
-                                        ▼
-                                   Caddy (HTTPS)  ─────────────────────  public :443
+```
+
+The public site ([cloud.md](cloud.md)) splits the same pieces in two:
+
+```
+private data repo (GitHub)                        Streamlit Community Cloud app
+  nightly Actions job: the pipeline above   ──►     Postgres + API on 127.0.0.1  ──►  public page
+  data/ committed after each good run      token      (src/cloud/backend.py)
 ```
 
 ## Pieces

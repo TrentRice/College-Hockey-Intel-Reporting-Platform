@@ -69,13 +69,17 @@ def backup_predictions(
     return path, rows
 
 
-def restore_predictions(database_url: str, path: Path) -> tuple[int, int]:
-    """Add a backup's rows that aren't in the log. Returns (rows in file, rows added)."""
+def restore_predictions(database_url: str, path: Path, replace: bool = False) -> tuple[int, int]:
+    """Add a backup's rows that aren't in the log. Returns (rows in file, rows added).
+    replace=True empties the log first (same transaction), so it ends up exactly the backup:
+    the cloud app uses this to pick up the nightly job's latest copy (docs/cloud.md)."""
     text = gzip.decompress(path.read_bytes()).decode()
     header = next(csv.reader(io.StringIO(text)))
     cols = ", ".join(header)
     with psycopg.connect(database_url) as conn:
         conn.execute(PREDICTIONS_SQL.read_text())
+        if replace:
+            conn.execute(f"DELETE FROM {TABLE}")
         conn.execute(f"CREATE TEMP TABLE restore (LIKE {TABLE}) ON COMMIT DROP")
         with conn.cursor().copy(f"COPY restore ({cols}) FROM STDIN WITH (FORMAT csv, HEADER)") as copy:
             copy.write(text)

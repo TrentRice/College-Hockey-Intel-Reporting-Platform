@@ -37,6 +37,9 @@ dashboard = [
     "requests>=2.34.2",
     "streamlit>=1.67.0",
 ]
+cloud = [  # Streamlit Community Cloud only (docs/cloud.md): a bundled Postgres for the app
+    "pixeltable-pgserver>=0.7.2",
+]
 dev = [
     "httpx2>=2.16.0",
     "ipykernel>=7.4.0",

@@ -1,0 +1,102 @@
+# Nightly CHIRP refresh. This file lives in the PRIVATE data repo (its source of truth is
+# deploy/data-repo/ in the public code repo; see docs/cloud.md there). Running here keeps
+# the logs private: they contain data excerpts, and a public repo's Actions logs are public.
+#
+# Each run checks out the public code, uses this repo as its data/ folder, refreshes against a
+# throwaway Postgres, and commits the results here. The Streamlit app picks them up within
+# about 10 minutes. Same rules as the Mac's scheduler (src/pipeline/scheduler.py): after
+# 5 a.m. Eastern, Mondays only May-August, and up to 3 tries a day an hour or more apart.
+name: Nightly refresh
+
+on:
+  schedule:  # GitHub's schedule is UTC and often runs a few minutes late
+    - cron: "30 10 * * *"   # 5:30 a.m. EST / 6:30 a.m. EDT
+    - cron: "30 13 * * *"   # a retry, only if the first one failed
+    - cron: "30 16 * * *"   # a last retry
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Run even if today's refresh already succeeded"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write  # commit the refreshed data to this repo
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: hockey
+          POSTGRES_PASSWORD: hockey
+          POSTGRES_DB: hockey
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hockey -d hockey"
+          --health-interval 2s --health-timeout 3s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://hockey:hockey@localhost:5432/hockey
+      TZ: America/New_York
+    steps:
+      - name: Get the code (public repo)
+        uses: actions/checkout@v4
+        with:
+          repository: TrentRice/College-Hockey-Intel-Reporting-Platform
+          path: code
+
+      - name: Get the data (this repo)
+        uses: actions/checkout@v4
+        with:
+          path: data
+
+      - name: Use this repo as the code's data/ folder
+        run: rm -rf code/data && ln -s "$GITHUB_WORKSPACE/data" code/data
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: code/uv.lock
+
+      - name: Install the pipeline's dependencies
+        working-directory: code
+        run: uv sync --locked --no-default-groups --group pipeline
+
+      - name: Refresh
+        id: refresh
+        continue-on-error: true
+        working-directory: code
+        run: uv run --no-sync python -m src.cloud.nightly ${{ inputs.force && '--force' || '' }}
+
+      # After a successful run, save everything. Otherwise save only the run history and the
+      # logs, so data that failed validation never reaches the app.
+      - name: Save to this repo
+        if: always()
+        working-directory: data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "${{ steps.refresh.outcome }}" = "success" ]; then
+            git add -A
+          else
+            git add -- pipeline_runs.csv || true
+            git add -- logs || true
+          fi
+          if git diff --cached --quiet; then echo "Nothing new to save."; exit 0; fi
+          git commit -q -m "Nightly refresh $(date +%F) (${{ steps.refresh.outcome }})"
+          git push -q
+
+      - name: Mark the run failed if the refresh failed
+        if: steps.refresh.outcome != 'success'
+        run: |
+          echo "The refresh failed. See the Refresh step above and logs/refresh/ in this repo."
+          exit 1

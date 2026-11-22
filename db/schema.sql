@@ -9,8 +9,21 @@
 -- See docs/schema.md for the diagram and how ids are assigned.
 
 CREATE SCHEMA IF NOT EXISTS hockey;
--- Accent-insensitive search ('Jeremie' finds 'Jérémie'); lives in public, outside the reload
-CREATE EXTENSION IF NOT EXISTS unaccent SCHEMA public;
+-- Accent-insensitive search ('Jeremie' finds 'Jérémie'); lives in public, outside the reload.
+-- The cloud app's bundled Postgres has no unaccent extension (docs/cloud.md), so there
+-- public.unaccent is a plain function covering the Latin letters in player names.
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS unaccent SCHEMA public;
+EXCEPTION WHEN feature_not_supported OR undefined_file THEN
+    CREATE OR REPLACE FUNCTION public.unaccent(text) RETURNS text
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $f$
+        SELECT translate($1,
+            'ÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝàáâãäåçèéêëìíîïñòóôõöùúûüýÿĀāĂăĄąĆćĈĉĊċČčĎďĒēĔĕĖėĘęĚěĜĝĞğĠġĢģĤĥĨĩĪīĬĭĮįİĲĳĴĵĶķĹĺĻļĽľĿŀŃńŅņŇňŌōŎŏŐőŔŕŖŗŘřŚśŜŝŞşŠšŢţŤťŨũŪūŬŭŮůŰűŲųŴŵŶŷŸŹźŻżŽžſØøŁłĐđĦħ',
+            'AAAAAACEEEEIIIINOOOOOUUUUYaaaaaaceeeeiiiinooooouuuuyyAaAaAaCcCcCcCcDdEeEeEeEeEeGgGgGgGgHhIiIiIiIiIIiJjKkLlLlLlLlNnNnNnOoOoOoRrRrRrSsSsSsSsTtTtUuUuUuUuUuUuWwYyYZzZzZzsOoLlDdHh')
+    $f$;
+END
+$$;
 SET search_path TO hockey;
 
 -- ----------------------------------------------------------------------------
