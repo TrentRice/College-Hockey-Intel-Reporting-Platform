@@ -53,12 +53,17 @@ state = running()
 with state["lock"]:  # one session starts the backend; the others wait for it
     version = code_version()
     if state["backend"] is not None and state["version"] != version:
-        state["backend"].stop()
+        # A backend from older code may predate stop(): then just let it go
+        if stop := getattr(state["backend"], "stop", None):
+            stop()
         state["backend"] = None
-        for name in [m for m in sys.modules if m.split(".")[0] in PACKAGES]:
-            del sys.modules[name]
         st.cache_data.clear()  # answers cached by the old code
     if state["backend"] is None:
+        # Always start from the code on disk: forget CHIRP modules imported earlier in this
+        # process, which may be older than the files (including this file's first run after
+        # an update)
+        for name in [m for m in sys.modules if m.split(".")[0] in PACKAGES]:
+            del sys.modules[name]
         from src.cloud.backend import Backend
 
         with st.spinner("Starting CHIRP: loading the latest data (about a minute)…"):
