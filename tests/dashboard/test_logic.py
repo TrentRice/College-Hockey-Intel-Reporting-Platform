@@ -5,6 +5,7 @@ import pytest
 from src.dashboard.logic import (
     LOWER_IS_BETTER,
     TEAM_STATS,
+    bucket_label,
     comparison_rows,
     default_last,
     delta_value,
@@ -233,3 +234,11 @@ def test_delta_values_are_numbers_rounded_as_shown(window, season, kind, expecte
 def test_differences_sort_by_value_not_text():
     values = [delta_value(w, s, "num") for w, s in [(1.2, 1.1), (0.6, 1.4), (0.8, 0.4), (0.5, 0.6)]]
     assert sorted(values) == [-0.8, -0.1, 0.1, 0.4]  # as text, "-0.10" would sort before "-0.80"
+
+
+@pytest.mark.parametrize(
+    "low, high, label",
+    [(0.5, 0.55, "50–55%"), (0.65, 0.7, "65–70%"), (0.7, 0.8, "70–80%"), (0.8, 1.0, "80–100%")],
+)
+def test_bucket_label(low, high, label):
+    assert bucket_label(low, high) == label

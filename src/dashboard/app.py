@@ -22,6 +22,7 @@ from src.dashboard.logic import (
     HEADLINE,
     TEAM_STATS,
     TIE,
+    bucket_label,
     comparison_rows,
     default_last,
     delta_value,
@@ -432,6 +433,7 @@ def render_model_record() -> None:
         colors = palette()
         cal = pd.DataFrame(summary["calibration"])
         cal["label"] = cal["games"].astype(str) + " g"
+        cal["group"] = [bucket_label(lo, hi) for lo, hi in zip(cal["low"], cal["high"])]
         diag = alt.Chart(pd.DataFrame({"x": [0.5, 1.0], "y": [0.5, 1.0]})).mark_line(
             color=colors["ref"], strokeDash=[4, 4]
         ).encode(x="x:Q", y="y:Q")
@@ -440,7 +442,8 @@ def render_model_record() -> None:
                     scale=alt.Scale(domain=[0.5, 1]), axis=alt.Axis(format="%")),
             y=alt.Y("actual:Q", title="How often the favorite won",
                     scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
-            tooltip=[alt.Tooltip("predicted:Q", format=".0%", title="Predicted"),
+            tooltip=[alt.Tooltip("group:N", title="Favorite's chance"),
+                     alt.Tooltip("predicted:Q", format=".0%", title="Average predicted"),
                      alt.Tooltip("actual:Q", format=".0%", title="Actual"),
                      alt.Tooltip("games:Q", title="Games")],
         )

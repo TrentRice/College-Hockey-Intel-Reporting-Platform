@@ -229,3 +229,8 @@ def game_label(g: dict) -> str:
     elif g.get("ot_periods"):
         extra = " OT"
     return f"{g['result']} {g['goals_for']}-{g['goals_against']}{extra}"
+
+
+def bucket_label(low: float, high: float) -> str:
+    """A calibration group's range for the chart's hover box: 0.8, 1.0 -> '80–100%'."""
+    return f"{round(low * 100)}–{round(high * 100)}%"
