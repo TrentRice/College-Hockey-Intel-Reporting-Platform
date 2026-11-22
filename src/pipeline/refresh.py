@@ -2,14 +2,14 @@
 The refresh pipeline: scrape -> download -> parse -> validate -> ids -> load.
 
   uv run python -m src.pipeline.refresh          # or: make refresh
-  (the Docker `pipeline` service runs it nightly; see src/pipeline/scheduler.py)
+  (GitHub Actions runs it nightly through src/cloud/nightly.py; see docs/pipeline.md)
 
 Steps run in order as separate processes, exactly as you'd run them by hand, and the run
 stops at the first failure. Validation is a gate: if it finds an unexplained mismatch the
 load is skipped, so the database keeps serving the last good data (status 'blocked').
 
 Safety
-  * One run at a time, wherever it was started (Docker or your terminal): a Postgres
+  * One run at a time, wherever it was started (GitHub Actions, Docker or your terminal): a Postgres
     advisory lock is held for the whole run.
   * Every run is recorded in ops.pipeline_runs (outside the `hockey` schema, which each
     load rebuilds), and the API's /health shows the latest one.

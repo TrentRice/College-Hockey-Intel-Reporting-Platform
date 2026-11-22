@@ -1,10 +1,12 @@
-# Local stack: Postgres, the CHIRP API, the nightly refresh and the scouting dashboard.
-# Start with `make up` (or `make db-up` for the database alone). Each service has its own
-# image, built from one Dockerfile (targets api, pipeline, dashboard).
+# Local development stack: Postgres, the CHIRP API and the scouting dashboard. Start with
+# `make up` (or `make db-up` for the database alone), then `make data-pull` for the latest data.
+# Each service has its own image, built from one Dockerfile (targets api, pipeline, dashboard).
+#
+# The public site doesn't use this file: it runs on Streamlit Community Cloud, refreshed
+# nightly by GitHub Actions in the private data repo (docs/cloud.md).
 #
 # PRIVATE BY DESIGN. College Hockey News allows personal use only, so every published port
-# is bound to 127.0.0.1: reachable from this machine, refused from any network. The public
-# self-hosted option adds Caddy for the dashboard only (docker-compose.prod.yml, docs/deploy.md). Never change
+# is bound to 127.0.0.1: reachable from this machine, refused from any network. Never change
 # a port to the "8000:8000" form (that listens on every network, and Docker bypasses the Mac
 # firewall), and never use network_mode: host.
 services:
@@ -53,7 +55,11 @@ services:
 
   # Nightly data refresh (src/pipeline/scheduler.py). No ports: it only reaches out to CHN
   # and to the database. The data stays on this Mac through the bind-mounted folders.
+  # Off by default: GitHub Actions does the nightly refresh now (docs/cloud.md), and running
+  # both would scrape CHN twice a day. Start it only on purpose:
+  #   docker compose --profile pipeline up -d pipeline
   pipeline:
+    profiles: ["pipeline"]
     build: { context: ., target: pipeline }
     image: chirp-pipeline:local
     container_name: chirp-pipeline

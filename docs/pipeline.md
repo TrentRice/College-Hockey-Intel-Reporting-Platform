@@ -1,7 +1,9 @@
 # Data refresh pipeline
 
-Keeps the database current during the season with no manual steps. Code:
-[src/pipeline/](../src/pipeline/).
+Keeps the data current during the season with no manual steps. It runs every morning in
+GitHub Actions, in the private `CHIRP-data` repo ([cloud.md](cloud.md)). Code:
+[src/pipeline/](../src/pipeline/), plus [src/cloud/nightly.py](../src/cloud/nightly.py) for
+the GitHub job.
 
 ```
 schedules ─► box scores ─► parse ─► validate ─► ids ─► load ─► predict ─► backup
@@ -21,43 +23,51 @@ schedules ─► box scores ─► parse ─► validate ─► ids ─► load 
 
 ## Running it
 
-**Automatically.** `make up` starts the `pipeline` service along with the database and API.
-It checks every 15 minutes and runs the refresh once a day:
+**Automatically, in GitHub Actions.** The `CHIRP-data` repo's workflow
+([deploy/data-repo/.github/workflows/refresh.yml](../deploy/data-repo/.github/workflows/refresh.yml))
+starts at 5:30, 8:30 and 11:30 a.m. EST (an hour later in summer). Each start runs
+`python -m src.cloud.nightly`, which applies the rules in
+[src/pipeline/scheduler.py](../src/pipeline/scheduler.py):
 
 - after **5:00 a.m. Eastern**, when late West Coast games are final
-- **catching up** if the Mac was asleep or Docker was closed at 5 a.m.
-- **retrying** a failed or blocked run after an hour, at most 3 tries a day
+- **retrying** a failed or blocked run on the next start, at most 3 tries a day
 - in the **off-season** (May to August), on Mondays only
 
-**By hand.** `make refresh` runs it now, for example to pull in tonight's games before a
-scouting report. A manual run counts as the day's run.
+Each job starts with an empty Postgres. So it first restores the run history
+(`pipeline_runs.csv`) and the newest prediction-log backup, then runs the steps above, then
+commits to `CHIRP-data`: everything after a success, only the history and logs otherwise. The
+public app picks up a new commit within about 10 minutes.
+
+Git doesn't keep file times, so the workflow marks the saved schedule pages as old before
+scraping; otherwise the 6-hour reuse rule would skip every page.
+
+**By hand.** In `CHIRP-data` on GitHub: **Actions → Nightly refresh → Run workflow** (tick
+*force* if today's run already succeeded). On the Mac, `make refresh` scrapes into the local
+database instead. That's rarely needed: `make data-pull` gets the nightly job's result.
 
 **Checking on it:**
-```
-make runs                       # the last 10 runs: when, how long, status, new games
-docker compose logs pipeline    # the scheduler's own log
-ls logs/refresh/                # one log per run, plus that run's validation report
-```
-`GET /health` on the API shows `data_as_of` (the last successful refresh) and the most recent
-run's status.
+- **The Actions tab** in `CHIRP-data`: each run, green or red. GitHub emails you when one fails.
+- **`pipeline_runs.csv`** in `CHIRP-data`: every run, with when, how long, status and new games.
+- **`logs/refresh/`** in `CHIRP-data`: one log per run, plus that run's validation report.
+- The dashboard's sidebar and the API's `GET /health` show when the data was last refreshed
+  and whether the latest run failed.
 
 ## What each status means
 
 | Status | Meaning | What to do |
 |---|---|---|
 | `success` | Everything loaded | Nothing |
-| `blocked` | Validation found an unexplained mismatch, so the load was skipped. The API keeps serving the last good data. | Read `logs/refresh/<run>.validation.md`. A late box score usually clears up on the hourly retry. A real error on CHN's page goes in `REVIEWED_SOURCE_ERRORS` in `validate_chn_data.py`. |
-| `failed` | A step broke: a network problem, CHN down, or a bug | Read `logs/refresh/<run>.log`. It retries in an hour. |
+| `blocked` | Validation found an unexplained mismatch, so nothing was committed. The site keeps serving the last good data. | Read `logs/refresh/<run>.validation.md` in `CHIRP-data`. A late box score usually clears up on the next retry. A real error on CHN's page goes in `REVIEWED_SOURCE_ERRORS` in `validate_chn_data.py`. |
+| `failed` | A step broke: a network problem, CHN down, or a bug | Read `logs/refresh/<run>.log` in `CHIRP-data`, or the run in the Actions tab. It retries on the next start. |
 
 ## Safety
-- **The prediction log is backed up nightly.** It's the one thing in the database that can't
-  be rebuilt from CHN. `make db-reset` backs it up first and stops if that fails
-  (`FORCE=1` skips the backup). After a reset, run `make load`, then
-  `make restore-predictions`, which adds rows from the newest backup and never overwrites
-  existing ones.
+- **The prediction log is backed up nightly** into `CHIRP-data`, where git keeps every
+  version. It's the one thing that can't be rebuilt from CHN. Locally, `make db-reset` backs
+  it up first and stops if that fails (`FORCE=1` skips the backup); afterwards
+  `make data-pull` reloads everything.
 
 - **One run at a time.** A Postgres advisory lock is held for the whole run, so a manual
-  `make refresh` can't overlap the scheduled one.
+  `make refresh` can't overlap another, and the workflow runs one job at a time.
 - **The database is never half-updated.** The load is a single transaction, and it only
   runs after validation passes.
 - **Polite to CHN.** It runs once a day (weekly in the off-season), keeps the scrapers'
@@ -65,12 +75,19 @@ run's status.
   ([src/ingestion/http.py](../src/ingestion/http.py)), skipping anything CHN asks crawlers
   to avoid.
 - **Run history** lives in `ops.pipeline_runs`, outside the `hockey` schema that every load
-  rebuilds. Logs are kept for the last 60 runs and are gitignored.
-- **No ports.** The pipeline container only makes outgoing requests, to CHN and to the
-  database. It runs as a non-root user on a read-only filesystem. Only `data/` and `logs/`
-  are writable, and both are folders on this Mac.
+  rebuilds, and in `CHIRP-data/pipeline_runs.csv` between jobs. Logs are kept for the last
+  60 runs, in `CHIRP-data` and never in this repo.
+- **Private logs.** The workflow lives in the private data repo, so its logs, which quote
+  data, aren't public.
 
 ## Cost
 
-A nightly run takes a few minutes, mostly the deliberate pauses between requests. Between
-runs the scheduler sleeps.
+Free. A nightly run takes about 2–6 minutes, mostly the deliberate pauses between requests:
+well within GitHub's 2,000 free Actions minutes a month for private repos.
+
+## The Docker scheduler (optional)
+
+The local Docker stack still has a `pipeline` service, which runs the same refresh once a
+day on the Mac ([src/pipeline/scheduler.py](../src/pipeline/scheduler.py)). It's off by
+default, a Compose profile, so the Mac and GitHub don't both scrape CHN. To run it on purpose:
+`docker compose --profile pipeline up -d pipeline`.

@@ -65,7 +65,7 @@ API's player-name search. The test suite passes on Postgres 13, 17 and 18.
 The nightly job checks out the public code repo, so the code needs to be on GitHub first:
 commit and push as usual.
 
-### 2. Create the data repo
+### 2. Create the data repo (done 2026-11-22)
 On the Mac, in the project folder:
 
 ```bash
@@ -118,16 +118,10 @@ Click **Generate token** and copy it (it starts with `github_pat_`). It's shown 
    ```
 4. Click **Deploy**. The first build installs the dependencies and takes a few minutes.
 
-### 6. Stop the Mac's nightly refresh
-The cloud job does it now, so stop the Mac from scraping College Hockey News twice a day:
-
-```bash
-docker compose stop pipeline
-```
-
-The rest of the local stack still works for development (`make up`). To work with fresh data
-locally, copy it from the data repo: `git -C ../CHIRP-data pull`, then copy its `processed/`
-and `backups/` into `data/` and run `make load`.
+### 6. The Mac doesn't scrape anymore
+The local Docker stack's `pipeline` service is off by default (a Compose profile), so
+`make up` starts only Postgres, the API and the dashboard. For fresh data locally, run
+`make data-pull`: it pulls `CHIRP-data`, copies it into `data/`, and loads it.
 
 ## Day to day
 

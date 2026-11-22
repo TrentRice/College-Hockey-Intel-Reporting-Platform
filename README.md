@@ -24,18 +24,23 @@ locally at http://127.0.0.1:8501) has six tabs:
 It defaults to BU and its next opponent. The sidebar picks your team, the team to scout, a
 cut-off date ("only games before"), and how many recent games to look at.
 
-## Quick start
+## Where it runs
+
+- **The public site:** Streamlit Community Cloud, free. The data lives in a private GitHub
+  repo, `CHIRP-data`, and GitHub Actions refreshes it every morning. Nothing runs on the Mac.
+  Setup and upkeep: [docs/cloud.md](docs/cloud.md).
+- **Local development:** the same database, API and dashboard in Docker on the Mac, on
+  127.0.0.1 only:
 
 ```bash
 cp .env.example .env     # set API_KEY
 make setup               # dependencies, plus notebook output stripping
-make up                  # Postgres, API, nightly pipeline, dashboard (Docker)
-make refresh             # first load: scrape College Hockey News and fill the database
+make up                  # Postgres, API and dashboard (Docker)
+make data-pull           # the latest data from the private data repo, loaded into Postgres
 ```
 
-Then open http://127.0.0.1:8501 (dashboard) or http://127.0.0.1:8000/docs (API). After the
-first load, the data refreshes itself every morning. Day-to-day commands are in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Then open http://127.0.0.1:8501 (dashboard) or http://127.0.0.1:8000/docs (API).
+Day-to-day commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## How it works
 
@@ -47,21 +52,30 @@ College Hockey News ─► scrape ─► parse ─► validate ─► ids ─►
                                      CHIRP API (key required) ─► Dashboard
 ```
 
+On the public site, the nightly steps run in GitHub Actions and commit the results to the
+private data repo. The Streamlit app loads them into its own Postgres and runs the same API
+and dashboard inside the app ([docs/cloud.md](docs/cloud.md)).
+
 - **Data:**
   - Scrapers collect every D-I team's schedule and every box score: goals, shots by period,
     special teams, skaters, goalies, goals and penalties.
   - A validation gate cross-checks them. If the numbers don't add up, the load is skipped
     and the last good data keeps serving.
   - Stable ids follow players across seasons, spelling changes and transfers.
-- **Database:** PostgreSQL 17, loaded as a full refresh in one transaction.
+- **Database:** PostgreSQL, loaded as a full refresh in one transaction (17 in Docker and in
+  the nightly job, 18 inside the Streamlit app).
 - **API:** FastAPI with read-only connections and an API key. It covers teams, games, box
   scores, players, leaders, form, win probabilities, rankings and the prediction log.
-- **Nightly pipeline:**
-  - Runs after 5 a.m. Eastern and catches up if the Mac was asleep. Every run is recorded.
+- **Nightly pipeline (GitHub Actions):**
+  - Runs after 5 a.m. Eastern, retries up to twice if it fails, and runs weekly in the
+    off-season. Every run is recorded, and a failure emails you.
   - Logs each game's win probability before the game and locks it on game day.
-  - Backs up the prediction log.
-- **Docker:** three small images from one Dockerfile (api, pipeline, dashboard), each with
-  only its own dependencies.
+  - Backs up the prediction log, and commits everything to the private data repo only if
+    validation passed.
+- **Public app:** Streamlit Community Cloud, with the data pulled from the private repo with a
+  read-only token. Only the dashboard page is public.
+- **Docker (local development):** three small images from one Dockerfile (api, pipeline,
+  dashboard), each with only its own dependencies.
 
 Details: [architecture](docs/architecture.md) · [database](docs/schema.md) ·
 [pipeline](docs/pipeline.md) · [API](docs/api.md) · [dashboard](docs/dashboard.md) ·
@@ -107,9 +121,9 @@ allow **personal, non-commercial use only**. So:
 
 ## Tech stack
 
-Python 3.12, uv · requests, BeautifulSoup/lxml, pandas · PostgreSQL 17, psycopg ·
+Python 3.12, uv · requests, BeautifulSoup/lxml, pandas · PostgreSQL, psycopg ·
 FastAPI · Streamlit + Altair · scikit-learn and Jupyter (model building) · Docker Compose ·
-GitHub Actions (tests).
+GitHub Actions (tests, nightly refresh) · Streamlit Community Cloud (public site).
 
 ## Project structure
 
@@ -120,6 +134,9 @@ src/
   features/    form over the last N games           models/      live win model code
   api/         FastAPI app                          dashboard/   Streamlit app
   pipeline/    nightly refresh, prediction log, backups
+  cloud/       the public site: nightly job, in-app Postgres + API
+cloud/         Streamlit Community Cloud entry point and its requirements
+deploy/        the private data repo's workflow and README (source of truth)
 db/            schema, feature views, prediction log
 notebooks/     EDA (01-08) and the frozen model (09)
 models/        model cards (the fitted .joblib files stay local)

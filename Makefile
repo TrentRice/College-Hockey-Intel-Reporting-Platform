@@ -1,4 +1,4 @@
-.PHONY: cloud-requirements data-repo setup lint format test up api-up down logs prod-up prod-down prod-logs prod-refresh prod-restore prod-runs refresh predict backup restore-predictions runs dashboard serve clean validate ids db-up db-down db-reset load psql
+.PHONY: cloud-requirements data-repo data-pull setup lint format test up api-up down logs refresh predict backup restore-predictions runs dashboard serve clean validate ids db-up db-down db-reset load psql
 
 # First-time setup: install every dependency group, and strip notebook outputs from git
 # (CHN data must never be committed; nbstripout's filter lives in .git/config, so a fresh
@@ -19,7 +19,8 @@ format:
 test:
 	uv run pytest -v
 
-# Start Postgres, the API, the nightly refresh and the dashboard in Docker
+# Start Postgres, the API and the dashboard in Docker (local development; the nightly refresh
+# runs in GitHub Actions, docs/cloud.md). Then `make data-pull` loads the latest data.
 #   dashboard: http://127.0.0.1:8501   API docs: http://127.0.0.1:8000/docs
 up api-up:
 	docker compose up -d --build --wait
@@ -32,29 +33,6 @@ down:
 logs:
 	docker compose logs -f
 
-# --- Public server (docs/deploy.md): the same stack plus Caddy for HTTPS ---------------
-PROD = docker compose -f docker-compose.yml -f docker-compose.prod.yml
-
-# Start or update the server's stack (after `git pull`)
-prod-up:
-	$(PROD) up -d --build --wait
-
-prod-down:
-	$(PROD) down
-
-prod-logs:
-	$(PROD) logs -f
-
-# Refresh the data now, inside the pipeline container (the server has no uv)
-prod-refresh:
-	$(PROD) exec pipeline python -m src.pipeline.refresh
-
-# Restore the prediction log from the newest backup in data/backups/
-prod-restore:
-	$(PROD) exec pipeline python -m src.pipeline.backup --restore
-
-prod-runs: runs
-
 # --- Streamlit Community Cloud (docs/cloud.md) ---------------------------------------------
 # Regenerate cloud/requirements.txt after changing dependencies (Streamlit Cloud installs it)
 cloud-requirements:
@@ -63,9 +41,22 @@ cloud-requirements:
 	  uv export --locked --no-default-groups --group api --group dashboard --group cloud \
 	    --no-hashes --no-header --no-annotate --no-emit-project; } > cloud/requirements.txt
 
-# Build the private data repo's first version from data/ (docs/cloud.md, step 1)
+# Where the private data repo is cloned (docs/cloud.md)
+DATA_REPO ?= ../CHIRP-data
+
+# Get the latest data from the private data repo into data/ and load it into the local
+# database: the tables, then the prediction log exactly as the nightly job left it
+data-pull: db-up
+	git -C "$(DATA_REPO)" pull -q
+	rsync -a --exclude .gitkeep "$(DATA_REPO)/raw/" data/raw/
+	rsync -a --delete --exclude .gitkeep --exclude validation/ "$(DATA_REPO)/processed/" data/processed/
+	rsync -a "$(DATA_REPO)/backups/" data/backups/
+	uv run python -m src.db.load
+	uv run python -m src.pipeline.backup --restore --replace
+
+# One time only, already done: build the data repo's first version from data/
 data-repo:
-	deploy/make-data-repo.sh ../CHIRP-data
+	deploy/make-data-repo.sh $(DATA_REPO)
 
 # Run data ingestion
 ingest:
@@ -104,7 +95,8 @@ load:
 psql:
 	docker compose exec -e PGOPTIONS="-c search_path=hockey" db psql -U hockey -d hockey
 
-# Refresh the data now: scrape, download, parse, validate, ids, load (also runs nightly in Docker)
+# Refresh the local data by scraping CHN from this Mac: scrape, download, parse, validate, ids,
+# load. Rarely needed: GitHub Actions refreshes nightly, and `make data-pull` gets the result
 refresh:
 	uv run python -m src.pipeline.refresh
 

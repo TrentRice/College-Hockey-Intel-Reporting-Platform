@@ -5,8 +5,13 @@ their **season so far**. Code: [src/dashboard/](../src/dashboard/).
 
 ## Opening it
 
+**The public site** is on Streamlit Community Cloud, at the `streamlit.app` address chosen when
+it was deployed ([cloud.md](cloud.md)).
+
+**Locally:**
 ```
-make up          # starts everything in Docker, including the dashboard
+make up          # Postgres, API and dashboard in Docker
+make data-pull   # the latest data, if you haven't loaded it yet
 ```
 Then go to **http://127.0.0.1:8501**.
 

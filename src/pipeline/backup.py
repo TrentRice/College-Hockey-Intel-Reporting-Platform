@@ -3,6 +3,7 @@ Backups of the prediction log, the one thing in the database that can't be rebui
 
   uv run python -m src.pipeline.backup                     # or `make backup`; nightly too
   uv run python -m src.pipeline.backup --restore [FILE]    # or `make restore-predictions`
+  uv run python -m src.pipeline.backup --restore --replace # the log becomes exactly the backup
 
 Everything else in Postgres can be reloaded from College Hockey News, but a prediction
 logged *before* a game can't be recreated afterwards. `make db-reset` deletes the database
@@ -98,7 +99,14 @@ def main() -> None:
         "--restore", nargs="?", const="latest", metavar="FILE",
         help="Restore a backup (default: the newest in data/backups)",
     )
+    ap.add_argument(
+        "--replace", action="store_true",
+        help="with --restore: empty the log first, so it ends up exactly the backup "
+        "(`make data-pull` uses this to take the nightly job's log)",
+    )
     args = ap.parse_args()
+    if args.replace and args.restore is None:
+        ap.error("--replace only works with --restore")
     if args.restore is None:
         path, rows = backup_predictions(settings.database_url)
         if path is None:
@@ -111,9 +119,12 @@ def main() -> None:
     if not path.exists():
         raise SystemExit(f"No backup at {path}. Backups live in {BACKUP_DIR.relative_to(ROOT)}/.")
     with refresh_guard(settings.database_url):
-        total, added = restore_predictions(settings.database_url, path)
-    print(f"Restored from {path.name}: {added} of {total} predictions added "
-          f"({total - added} were already in the log)")
+        total, added = restore_predictions(settings.database_url, path, replace=args.replace)
+    if args.replace:
+        print(f"Replaced the prediction log with {path.name}: {total} predictions")
+    else:
+        print(f"Restored from {path.name}: {added} of {total} predictions added "
+              f"({total - added} were already in the log)")
 
 
 if __name__ == "__main__":

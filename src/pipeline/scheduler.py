@@ -1,5 +1,7 @@
 """
-Runs the refresh once a day. This is the Docker `pipeline` service's main process.
+Runs the refresh once a day. This is the Docker `pipeline` service's main process, which is
+off by default now (a Compose profile): GitHub Actions runs the nightly refresh, through
+src/cloud/nightly.py, using should_run() below with the same rules (docs/pipeline.md).
 
 Every CHECK_EVERY it asks ops.pipeline_runs: has today's refresh succeeded yet? It runs one
 when all of these hold:

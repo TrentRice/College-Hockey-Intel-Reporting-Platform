@@ -39,7 +39,8 @@ private data repo (GitHub)                        Streamlit Community Cloud app
 | Scrapers, parser, validation | `src/ingestion/`, `src/evaluation/` | [data_validation.md](data_validation.md) |
 | Stable team and player ids | `src/transform/id_mapping.py` | [schema.md](schema.md) |
 | Database and loader | `db/schema.sql`, `db/features.sql`, `src/db/load.py` | [schema.md](schema.md) |
-| Nightly refresh, prediction log, backups | `src/pipeline/` | [pipeline.md](pipeline.md) |
+| Nightly refresh, prediction log, backups | `src/pipeline/`, `src/cloud/nightly.py` | [pipeline.md](pipeline.md) |
+| Public site: GitHub Actions job, Streamlit app | `src/cloud/`, `cloud/`, `deploy/data-repo/` | [cloud.md](cloud.md) |
 | Form features (last N games) | `src/features/form.py` | [features.md](features.md) |
 | Win model v1 (live predictions, rankings) | `src/models/win_model.py`, `models/win_model_v1.json` | [model.md](model.md) |
 | API | `src/api/` | [api.md](api.md) |
@@ -48,7 +49,8 @@ private data repo (GitHub)                        Streamlit Community Cloud app
 
 ## Decisions worth knowing
 
-- **Postgres in Docker, one database with separate schemas:**
+- **Postgres, one database with separate schemas.** It's in Docker on the Mac; in the cloud,
+  each nightly job and each app start gets a fresh one, filled from the private data repo:
   - **`hockey`:** the data, rebuilt in full by every load, in one transaction.
   - **`features`:** views over `hockey`.
   - **`ops`:** refresh run history.
@@ -58,11 +60,15 @@ private data repo (GitHub)                        Streamlit Community Cloud app
   read-only, so no endpoint can change data.
 - **Validation is a gate.** If CHN's numbers don't add up, the load is skipped and the last
   good data keeps serving.
-- **No data in git.** CSVs, raw pages, backups and notebook outputs (stripped by
-  nbstripout) stay on this Mac. The model card JSON holds coefficients only.
+- **No data in this repo.** CSVs, raw pages, backups and logs live in the private
+  `CHIRP-data` repo (and in `data/` on the Mac, gitignored). Notebook outputs are stripped by
+  nbstripout. The model card JSON holds coefficients only.
+- **The public site runs the same code.** The nightly job calls the same refresh, and the
+  Streamlit app runs the same loader, API and dashboard. Only the glue differs:
+  `src/cloud/`.
 - **Notebooks build the model, Python modules serve it.** Notebook 09 checks that the live
   code (`src/models/win_model.py`) reproduces the frozen model exactly.
-- **One Dockerfile, three images:**
+- **One Dockerfile, three images** (local development):
   - **api:** FastAPI and psycopg only.
   - **pipeline:** scrapers and pandas.
   - **dashboard:** Streamlit.

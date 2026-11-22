@@ -6,23 +6,26 @@ Notes for future me.
 
 ```bash
 git clone <repo-url> && cd <repo>
+git clone https://github.com/TrentRice/CHIRP-data.git ../CHIRP-data   # private: the data
 cp .env.example .env     # then set API_KEY (see the comment in the file)
 make setup               # installs dependencies; turns on notebook output stripping
-make up                  # Postgres, API, nightly pipeline and dashboard in Docker
+make up                  # Postgres, API and dashboard in Docker
+make data-pull           # copies the latest data into data/ and loads it
 ```
 
-The database starts empty. The first `make refresh`, or the first nightly run, scrapes CHN
-and loads it. **The data never goes in this repo** (College Hockey News: personal use only).
-The public site's copy lives in the private `CHIRP-data` repo ([docs/cloud.md](docs/cloud.md)).
+**The data never goes in this repo** (College Hockey News: personal use only). It lives in
+the private `CHIRP-data` repo, which GitHub Actions refreshes every morning
+([docs/cloud.md](docs/cloud.md)). Run `make data-pull` whenever you want the latest locally.
 
 ## Day to day
 
 | Command | What it does |
 |---|---|
-| `make up` / `make down` | Start / stop everything in Docker (data is kept) |
+| `make up` / `make down` | Start / stop the local stack in Docker (data is kept) |
+| `make data-pull` | Latest data from the private data repo, loaded into the local database |
 | `make logs` | Follow the containers' logs |
-| `make refresh` | Run the full data refresh now (normally nightly) |
-| `make runs` | Recent refresh runs and their status |
+| `make refresh` | Scrape CHN from the Mac and load the result (rarely needed: the nightly job does this) |
+| `make runs` | Refresh runs recorded in the local database (the nightly job's are in `CHIRP-data`) |
 | `make predict` | Log win probabilities for the coming week now |
 | `make backup` / `make restore-predictions` | Back up / restore the prediction log |
 | `make dashboard` | Dashboard outside Docker, reloading on save (stop the Docker one first) |
@@ -30,10 +33,10 @@ The public site's copy lives in the private `CHIRP-data` repo ([docs/cloud.md](d
 | `make psql` | SQL prompt on the database |
 | `make test` | All tests (needs `make db-up`; they use a separate made-up test database) |
 | `make lint` / `make format` | Ruff |
+| `make cloud-requirements` | Regenerate `cloud/requirements.txt` for Streamlit Cloud after a dependency change |
 
-The public site (Streamlit Community Cloud, nightly refresh in GitHub Actions) is in
-[docs/cloud.md](docs/cloud.md). `make prod-*` is for the self-hosted alternative,
-[docs/deploy.md](docs/deploy.md).
+The public site is in [docs/cloud.md](docs/cloud.md): pushing to `main` redeploys it, and the
+nightly refresh runs in the `CHIRP-data` repo's **Actions** tab.
 
 ## Things that matter
 
@@ -46,5 +49,12 @@ The public site (Streamlit Community Cloud, nightly refresh in GitHub Actions) i
   `make load` and `make restore-predictions`.
 - **New dependency:** add it to the group that needs it (`uv add --group api|pipeline|dashboard
   <package>`, or `uv add --dev` for notebooks and tests). Shared ones go in the main list.
-  Each Docker image installs only its own group.
+  Each Docker image installs only its own group. If the API or dashboard needs it, run
+  `make cloud-requirements` too, or the public app won't have it.
+- **The nightly workflow has two copies.** The source of truth is
+  `deploy/data-repo/.github/workflows/refresh.yml` here. After changing it, copy it into
+  `../CHIRP-data/.github/workflows/` and push both repos.
+- **Local Docker doesn't scrape.** The `pipeline` service is off by default (a Compose
+  profile), so the Mac and GitHub never both hit CHN. Start it only on purpose:
+  `docker compose --profile pipeline up -d pipeline`.
 - **Commits:** I commit and push myself. Imperative messages ("Add rankings tab").
