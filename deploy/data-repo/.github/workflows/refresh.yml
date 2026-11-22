@@ -61,6 +61,13 @@ jobs:
       - name: Use this repo as the code's data/ folder
         run: rm -rf code/data && ln -s "$GITHUB_WORKSPACE/data" code/data
 
+      # The scraper reuses a saved schedule page younger than 6 hours, judged by the file's
+      # modified time. Git doesn't keep those times, so after a checkout every page looks
+      # seconds old and nothing would be re-downloaded. Mark them old; pages of finished
+      # seasons are still reused (the scraper checks that separately).
+      - name: Mark saved schedule pages as old
+        run: find data/raw/chn/schedules -name '*.html' -exec touch -d '2000-01-01' {} +
+
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
