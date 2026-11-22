@@ -94,7 +94,8 @@ save. Stop the Docker one first (`docker compose stop dashboard`), because both 
     below its record. The gaps point to over- and underachievers.
   - The ordering agrees with every neutral-site prediction on the Win probability tab.
 - **Limits:**
-  - **Not adjusted for strength of schedule.**
+  - **Not adjusted for strength of schedule.** It was tested, but it didn't help consistently
+    with one season of data ([model.md](model.md)).
   - Teams need 5 D-I games to be ranked, since shot share means little before that. So the
     tab is empty for the first weeks of a season.
   - Teams a few points apart are close to a coin flip.

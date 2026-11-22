@@ -577,7 +577,8 @@ def render_rankings() -> None:
             f"{mine['beats_average']:.0%}, {mine['record']}, {movement(mine['change'])} since last week."
         )
     st.caption(
-        f"Model {data['model']}. **Not adjusted for strength of schedule.** Teams need "
+        f"Model {data['model']}. **Not adjusted for strength of schedule** (tested; it didn't "
+        "help consistently yet). Teams need "
         f"{data['min_games']} D-I games to be ranked ({data['unranked']} aren't yet). "
         f"\"Last week\" compares with games before {pd.Timestamp(data['compared_to']):%b %-d}. "
         "Teams a few points apart are close to a coin flip."

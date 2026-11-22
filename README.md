@@ -92,8 +92,14 @@ time-ordered folds of 2025-26.
 never seen. Through Nov 13 that's 173 games: **log loss 0.643 vs 0.680 for the home win
 rate, AUC 0.67, 64% of winners picked.** The live record is on the Model record tab.
 
-**Limits:** it's weak in a season's first weeks, it isn't adjusted for strength of schedule,
-and it knows nothing about players. Full card: [docs/model.md](docs/model.md).
+**Limits:**
+- **Weak in a season's first weeks.**
+- **Not adjusted for strength of schedule.** It was tested, but with one season of data it
+  didn't help consistently (better in only 2 of 4 test folds). So it's left out for now, and
+  it's the first thing to revisit in v2.
+- **Knows nothing about players.**
+
+Full card: [docs/model.md](docs/model.md).
 
 **Next:** v2 carries last season over, so early-season predictions and rankings work from
 opening night. It's planned for 2027-28, once 2026-27 is complete (plan in

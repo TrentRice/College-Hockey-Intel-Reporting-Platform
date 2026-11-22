@@ -77,7 +77,9 @@ least 3 games (the warm-up).
   - The fix is model v2 (last season carried over), planned for 2027-28 (see
     [eda.md](eda.md)).
 - **Not adjusted for strength of schedule.** A team that piled up stats against weak
-  opponents rates too high.
+  opponents rates too high. It was tested ([eda.md](eda.md)): a gain of +0.0016 in log loss,
+  but better in only 2 of 4 test folds, too inconsistent with one season of data. It's left
+  out for now and is the first thing to revisit in v2.
 - **Neutral sites are treated as exactly neutral.** A tournament close to one team's campus
   isn't modeled.
 - **Nothing about players.** Injuries, a hot goalie or lineup changes are invisible to it.
