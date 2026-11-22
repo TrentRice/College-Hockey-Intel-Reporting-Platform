@@ -1,6 +1,9 @@
 # Working on CHIRP
 
-Notes for future me.
+Notes for future me. The live site is
+[chirp-hockey.streamlit.app](https://chirp-hockey.streamlit.app) ([docs/cloud.md](docs/cloud.md)).
+This page is for running CHIRP on the Mac to try changes before pushing them: the same
+database, API and dashboard in Docker, reachable from this computer only (127.0.0.1).
 
 ## First-time setup
 
@@ -12,6 +15,8 @@ make setup               # installs dependencies; turns on notebook output strip
 make up                  # Postgres, API and dashboard in Docker
 make data-pull           # copies the latest data into data/ and loads it
 ```
+
+Then open http://127.0.0.1:8501 (dashboard) or http://127.0.0.1:8000/docs (API).
 
 **The data never goes in this repo** (College Hockey News: personal use only). It lives in
 the private `CHIRP-data` repo, which GitHub Actions refreshes every morning

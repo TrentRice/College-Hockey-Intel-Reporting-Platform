@@ -12,8 +12,8 @@ every morning.
 
 ## What it does
 
-The dashboard ([chirp-hockey.streamlit.app](https://chirp-hockey.streamlit.app), or
-http://127.0.0.1:8501 locally) has seven tabs:
+The dashboard at [chirp-hockey.streamlit.app](https://chirp-hockey.streamlit.app) has seven
+tabs:
 
 | Tab | What it shows |
 |---|---|
@@ -30,24 +30,11 @@ cut-off date ("only games before"), and how many recent games to look at.
 
 ## Where it runs
 
-- **The public site,
-  [chirp-hockey.streamlit.app](https://chirp-hockey.streamlit.app):** Streamlit Community
-  Cloud, free. The data lives in a private GitHub repo, `CHIRP-data`, and GitHub Actions
-  refreshes it every morning. Nothing runs on the Mac. Setup and upkeep:
-  [docs/cloud.md](docs/cloud.md).
-- **Local development:** the same database, API and dashboard in Docker on the Mac, on
-  127.0.0.1 only:
+[chirp-hockey.streamlit.app](https://chirp-hockey.streamlit.app) runs free on Streamlit
+Community Cloud. The data lives in a private GitHub repo, `CHIRP-data`, and GitHub Actions
+refreshes it every morning. Setup and upkeep: [docs/cloud.md](docs/cloud.md).
 
-```bash
-git clone https://github.com/TrentRice/CHIRP-data.git ../CHIRP-data   # the private data
-cp .env.example .env     # set API_KEY
-make setup               # dependencies, plus notebook output stripping
-make up                  # Postgres, API and dashboard (Docker)
-make data-pull           # the latest data from the private data repo, loaded into Postgres
-```
-
-Then open http://127.0.0.1:8501 (dashboard) or http://127.0.0.1:8000/docs (API).
-Day-to-day commands are in [CONTRIBUTING.md](CONTRIBUTING.md).
+To run CHIRP on your own computer for development, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## How it works
 
@@ -69,8 +56,7 @@ and dashboard inside the app ([docs/cloud.md](docs/cloud.md)).
   - A validation gate cross-checks them. If the numbers don't add up, the load is skipped
     and the last good data keeps serving.
   - Stable ids follow players across seasons, spelling changes and transfers.
-- **Database:** PostgreSQL, loaded as a full refresh in one transaction (17 in Docker and in
-  the nightly job, 18 inside the Streamlit app).
+- **Database:** PostgreSQL, loaded as a full refresh in one transaction.
 - **API:** FastAPI with read-only connections and an API key. It covers teams, games, box
   scores, players, leaders, form, win probabilities, rankings and the prediction log.
 - **Nightly pipeline (GitHub Actions):**
@@ -82,8 +68,6 @@ and dashboard inside the app ([docs/cloud.md](docs/cloud.md)).
 - **Public app:** Streamlit Community Cloud, with the data pulled from the private repo with a
   read-only token. Only the dashboard page is public. An idle app naps after 12 hours, and
   the next visitor wakes it in about a minute.
-- **Docker (local development):** three small images from one Dockerfile (api, pipeline,
-  dashboard), each with only its own dependencies.
 
 Details: [architecture](docs/architecture.md) · [database](docs/schema.md) ·
 [pipeline](docs/pipeline.md) · [API](docs/api.md) · [dashboard](docs/dashboard.md) ·
@@ -123,15 +107,14 @@ allow **personal, non-commercial use only**. So:
   all gitignored or stripped. The public site's data lives in a separate **private** repo,
   refreshed nightly by GitHub Actions ([docs/cloud.md](docs/cloud.md)).
 - **Only the dashboard is public,** with CHN's permission. The API and database run privately
-  on 127.0.0.1 (on the Mac, or inside the Streamlit app), the API needs a key, and the scrapers
-  respect robots.txt.
+  inside the Streamlit app, the API needs a key, and the scrapers respect robots.txt.
 - **Only 2025-26 onward is kept** (see [docs/schema.md](docs/schema.md#data-source-and-use)).
 
 ## Tech stack
 
 Python 3.12, uv · requests, BeautifulSoup/lxml, pandas · PostgreSQL, psycopg ·
-FastAPI · Streamlit + Altair · scikit-learn and Jupyter (model building) · Docker Compose ·
-GitHub Actions (tests, nightly refresh) · Streamlit Community Cloud (public site).
+FastAPI · Streamlit + Altair · scikit-learn and Jupyter (model building) · GitHub Actions
+(tests, nightly refresh) · Streamlit Community Cloud (public site).
 
 ## Project structure
 
