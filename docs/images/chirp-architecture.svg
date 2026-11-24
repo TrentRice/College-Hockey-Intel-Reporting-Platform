@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 960" width="1600" height="960" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>CHIRP architecture</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrow-model" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/>
+    </marker>
+    <style>
+      .box { fill: #ffffff; stroke: #334155; stroke-width: 2; }
+      .title { font-size: 17px; font-weight: 700; fill: #0f172a; text-anchor: middle; }
+      .sub { font-size: 13px; fill: #475569; text-anchor: middle; }
+      .lane-label { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; }
+      .lane-sub { font-size: 14px; fill: #475569; }
+      .flow { stroke: #334155; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+      .model { stroke: #7c3aed; stroke-width: 2.2; fill: none; stroke-dasharray: 7 5; marker-end: url(#arrow-model); }
+      .note { font-size: 13px; fill: #334155; }
+      .note-model { font-size: 13px; fill: #6d28d9; font-weight: 600; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="960" fill="#f8fafc"/>
+
+  <!-- Heading -->
+  <text x="40" y="58" font-size="30" font-weight="800" fill="#0f172a">CHIRP architecture</text>
+  <text x="40" y="88" font-size="16" fill="#475569">From College Hockey News pages to a public win-probability dashboard, refreshed automatically every morning</text>
+
+  <!-- ===================== Lane 1: nightly refresh ===================== -->
+  <rect x="40" y="110" width="1520" height="220" rx="16" fill="#eef2ff" stroke="#c7d2fe" stroke-width="1.5"/>
+  <text x="64" y="142" class="lane-label" fill="#3730a3">NIGHTLY REFRESH</text>
+  <text x="232" y="142" class="lane-sub">GitHub Actions, in the private data repo · every morning after 5 a.m. ET</text>
+
+  <!-- CHN (external source) -->
+  <rect x="60" y="165" width="180" height="100" rx="12" class="box" stroke-dasharray="6 4"/>
+  <text x="150" y="203" class="title" style="font-size: 15px">College Hockey News</text>
+  <text x="150" y="226" class="sub">schedules + box scores</text>
+  <text x="150" y="246" class="sub">(source, with permission)</text>
+
+  <rect x="268" y="165" width="180" height="100" rx="12" class="box"/>
+  <text x="358" y="203" class="title">Scrape</text>
+  <text x="358" y="226" class="sub">requests + BeautifulSoup</text>
+  <text x="358" y="246" class="sub">robots.txt · 2 s per page</text>
+
+  <rect x="476" y="165" width="180" height="100" rx="12" class="box" stroke="#d97706" stroke-width="2.5"/>
+  <text x="566" y="203" class="title">Validate</text>
+  <text x="566" y="226" class="sub">16 exact cross-checks</text>
+  <text x="566" y="246" class="sub" fill="#b45309">gate: fail = no update</text>
+
+  <rect x="684" y="165" width="180" height="100" rx="12" class="box"/>
+  <text x="774" y="203" class="title">Stable IDs</text>
+  <text x="774" y="226" class="sub">players across seasons,</text>
+  <text x="774" y="246" class="sub">spellings and transfers</text>
+
+  <rect x="892" y="165" width="180" height="100" rx="12" class="box"/>
+  <text x="982" y="203" class="title">Load</text>
+  <text x="982" y="226" class="sub">PostgreSQL 17 (temporary)</text>
+  <text x="982" y="246" class="sub">one transaction</text>
+
+  <rect x="1100" y="165" width="180" height="100" rx="12" class="box"/>
+  <text x="1190" y="203" class="title">Predict</text>
+  <text x="1190" y="226" class="sub">win model v1</text>
+  <text x="1190" y="246" class="sub">logs the coming week</text>
+
+  <rect x="1308" y="165" width="180" height="100" rx="12" class="box"/>
+  <text x="1398" y="203" class="title">Back up</text>
+  <text x="1398" y="226" class="sub">prediction log</text>
+  <text x="1398" y="246" class="sub">+ run history</text>
+
+  <path d="M240,215 L266,215" class="flow"/>
+  <path d="M448,215 L474,215" class="flow"/>
+  <path d="M656,215 L682,215" class="flow"/>
+  <path d="M864,215 L890,215" class="flow"/>
+  <path d="M1072,215 L1098,215" class="flow"/>
+  <path d="M1280,215 L1306,215" class="flow"/>
+
+  <!-- ===================== Middle: model card, data repo, legend ===================== -->
+  <!-- Legend -->
+  <text x="60" y="400" font-size="14" font-weight="700" fill="#0f172a">Key</text>
+  <path d="M60,428 L130,428" class="flow"/>
+  <text x="142" y="433" class="note">data flow</text>
+  <path d="M60,458 L130,458" class="model"/>
+  <text x="142" y="463" class="note">frozen model card</text>
+  <rect x="60" y="480" width="70" height="30" rx="6" fill="#ffffff" stroke="#334155" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="142" y="500" class="note">outside the platform / offline</text>
+
+  <!-- Model building (offline) -->
+  <rect x="560" y="375" width="420" height="115" rx="12" fill="#faf5ff" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="770" y="408" class="title" fill="#5b21b6">Model building (offline, done once)</text>
+  <text x="770" y="432" class="sub">Jupyter notebooks 01–09 · time-series CV · scikit-learn</text>
+  <text x="770" y="452" class="sub">logistic regression: shot share + goal diff + home ice</text>
+  <text x="770" y="474" class="sub" fill="#6d28d9" font-weight="600">frozen card: win_model_v1.json</text>
+
+  <!-- CHIRP-data private repo -->
+  <rect x="1240" y="375" width="300" height="115" rx="12" fill="#ffffff" stroke="#0f172a" stroke-width="2.5"/>
+  <text x="1390" y="408" class="title">CHIRP-data</text>
+  <text x="1390" y="432" class="sub">private GitHub repo</text>
+  <text x="1390" y="452" class="sub">pages · tables · prediction log</text>
+  <text x="1390" y="472" class="sub">run history · logs</text>
+
+  <!-- commit arrow: Back up -> CHIRP-data -->
+  <path d="M1398,265 L1398,373" class="flow"/>
+  <text x="1410" y="292" class="note">commit, only if</text>
+  <text x="1410" y="310" class="note">validation passed</text>
+
+  <!-- model card -> Predict -->
+  <path d="M900,375 C960,330 1120,320 1176,268" class="model"/>
+  <text x="1010" y="345" class="note-model">coefficients</text>
+
+  <!-- ===================== Lane 2: public site ===================== -->
+  <rect x="40" y="590" width="1520" height="300" rx="16" fill="#ecfdf5" stroke="#a7f3d0" stroke-width="1.5"/>
+  <text x="64" y="622" class="lane-label" fill="#047857">PUBLIC SITE</text>
+  <text x="182" y="622" class="lane-sub">Streamlit Community Cloud · chirp-hockey.streamlit.app</text>
+
+  <!-- private container inside the app -->
+  <rect x="700" y="645" width="830" height="225" rx="14" fill="#ffffff" fill-opacity="0.55" stroke="#047857" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="720" y="856" font-size="13" font-weight="600" fill="#047857">Private: runs inside the app on 127.0.0.1, never reachable from outside</text>
+
+  <!-- Visitors -->
+  <rect x="60" y="700" width="200" height="100" rx="12" class="box" stroke-dasharray="6 4"/>
+  <text x="160" y="738" class="title">Visitors</text>
+  <text x="160" y="761" class="sub">any browser</text>
+  <text x="160" y="781" class="sub">sleeps after 12 h idle</text>
+
+  <!-- Streamlit -->
+  <rect x="380" y="700" width="230" height="100" rx="12" class="box" stroke="#047857" stroke-width="2.5"/>
+  <text x="495" y="738" class="title">Streamlit dashboard</text>
+  <text x="495" y="761" class="sub">7 tabs · Altair charts</text>
+  <text x="495" y="781" class="sub" fill="#047857" font-weight="600">the only public part</text>
+
+  <!-- FastAPI -->
+  <rect x="740" y="700" width="200" height="100" rx="12" class="box"/>
+  <text x="840" y="738" class="title">FastAPI</text>
+  <text x="840" y="761" class="sub">21 read-only endpoints</text>
+  <text x="840" y="781" class="sub">random API key</text>
+
+  <!-- PostgreSQL 18 -->
+  <rect x="1020" y="700" width="200" height="100" rx="12" class="box"/>
+  <text x="1120" y="738" class="title">PostgreSQL 18</text>
+  <text x="1120" y="761" class="sub">fresh on each start</text>
+  <text x="1120" y="781" class="sub">same loader as nightly</text>
+
+  <!-- Loader -->
+  <rect x="1300" y="700" width="200" height="100" rx="12" class="box"/>
+  <text x="1400" y="738" class="title">Load data</text>
+  <text x="1400" y="761" class="sub">read-only token</text>
+  <text x="1400" y="781" class="sub">checks every 10 min</text>
+
+  <!-- CHIRP-data -> Loader -->
+  <path d="M1400,490 L1400,698" class="flow"/>
+  <text x="1412" y="560" class="note">download newest</text>
+  <text x="1412" y="578" class="note">tables + log</text>
+
+  <!-- model card -> FastAPI -->
+  <path d="M840,490 L840,698" class="model"/>
+  <text x="852" y="560" class="note-model">same frozen</text>
+  <text x="852" y="578" class="note-model">card</text>
+
+  <!-- lane 2 flows (right to left) -->
+  <path d="M1300,750 L1222,750" class="flow"/>
+  <path d="M1020,750 L942,750" class="flow"/>
+  <text x="981" y="740" class="sub">SQL</text>
+  <path d="M740,750 L612,750" class="flow"/>
+  <text x="676" y="740" class="sub">JSON</text>
+  <path d="M380,750 L262,750" class="flow"/>
+  <text x="321" y="740" class="sub">web page</text>
+
+  <!-- Footer -->
+  <text x="40" y="928" font-size="14" fill="#475569">Code: public GitHub repo, tested on every push by GitHub Actions CI. Data: private repo only. The API, database and raw data are never public.</text>
+</svg>
