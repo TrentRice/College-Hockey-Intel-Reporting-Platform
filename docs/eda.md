@@ -1,8 +1,8 @@
 # EDA findings: what predicts a college hockey win
 
 The conclusions of the 2025-26 EDA, and the feature set it hands to the model. The plan and
-rules are in [eda_plan.md](eda_plan.md). The work is in `notebooks/01`–`08`. This document
-holds conclusions only: CHN data stays out of the repo.
+rules are in [eda_plan.md](eda_plan.md). The work, with every table and chart, is in
+`notebooks/01`–`08` (GitHub shows their outputs). This document holds the conclusions.
 
 ## The model in one line
 

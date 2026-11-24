@@ -11,7 +11,7 @@ database, API and dashboard in Docker, reachable from this computer only (127.0.
 git clone <repo-url> && cd <repo>
 git clone https://github.com/TrentRice/CHIRP-data.git ../CHIRP-data   # private: the data
 cp .env.example .env     # then set API_KEY (see the comment in the file)
-make setup               # installs dependencies; turns on notebook output stripping
+make setup               # installs dependencies
 make up                  # Postgres, API and dashboard in Docker
 make data-pull           # copies the latest data into data/ and loads it
 ```
@@ -45,9 +45,10 @@ nightly refresh runs in the `CHIRP-data` repo's **Actions** tab.
 
 ## Things that matter
 
-- **Notebooks:** analysis and model building live in `notebooks/`, numbered in order. Their
-  outputs are stripped on commit (CHN data). After a fresh clone, `make setup` turns that
-  back on.
+- **Notebooks:** analysis and model building live in `notebooks/`, numbered in order. They're
+  committed **with their outputs**, so GitHub shows the tables and charts (College Hockey News
+  approved this). Re-run a notebook top to bottom before committing it, so its outputs match
+  its code. The data files themselves never go in this repo.
 - **The model is frozen.** `models/win_model_v1.json` is v1's card, and v1 never changes. A
   new model is v2, built by the plan in `docs/eda.md`.
 - **`make db-reset` deletes the database.** It backs up the prediction log first. Then run

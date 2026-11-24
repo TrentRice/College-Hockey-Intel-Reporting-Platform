@@ -61,8 +61,9 @@ private data repo (GitHub)                        Streamlit Community Cloud app
 - **Validation is a gate.** If CHN's numbers don't add up, the load is skipped and the last
   good data keeps serving.
 - **No data in this repo.** CSVs, raw pages, backups and logs live in the private
-  `CHIRP-data` repo (and in `data/` on the Mac, gitignored). Notebook outputs are stripped by
-  nbstripout. The model card JSON holds coefficients only.
+  `CHIRP-data` repo (and in `data/` on the Mac, gitignored). Notebooks are committed with
+  their outputs, which College Hockey News approved. The model card JSON holds coefficients
+  only.
 - **The public site runs the same code.** The nightly job calls the same refresh, and the
   Streamlit app runs the same loader, API and dashboard. Only the glue differs:
   `src/cloud/`.

@@ -18,9 +18,9 @@ features are chosen on evidence. **No xG** (another model's output) and **no fac
 - **Built as Jupyter notebooks** in `notebooks/`, numbered in order.
   `01_pregame_features.ipynb` builds the features and runs the leakage checks. Later
   notebooks load it with `%run ./01_pregame_features.ipynb`.
-- **No CHN data in git:** nbstripout removes notebook outputs when you commit, while your
-  local copies keep them. It's set up through `.gitattributes`. After a fresh clone, run
-  `uv run nbstripout --install` once. `docs/eda.md` holds conclusions, not data tables.
+- **No CHN data files in git.** The notebooks are committed with their outputs (College
+  Hockey News approved this in November 2026; until then nbstripout removed them on commit).
+  `docs/eda.md` holds the conclusions.
 
 ## Steps
 

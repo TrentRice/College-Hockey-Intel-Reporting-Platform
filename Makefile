@@ -1,11 +1,8 @@
 .PHONY: cloud-requirements data-repo data-pull setup lint format test up api-up down logs refresh predict backup restore-predictions runs dashboard serve clean validate ids db-up db-down db-reset load psql
 
-# First-time setup: install every dependency group, and strip notebook outputs from git
-# (CHN data must never be committed; nbstripout's filter lives in .git/config, so a fresh
-# clone needs it again)
+# First-time setup: install every dependency group
 setup:
 	uv sync
-	uv run nbstripout --install --attributes .gitattributes
 
 # Lint and auto-format (ruff runs through uvx; it isn't a project dependency)
 lint:
