@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 960" width="1600" height="960" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 990" width="1600" height="990" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title>CHIRP architecture</title>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
@@ -17,154 +17,170 @@
       .model { stroke: #7c3aed; stroke-width: 2.2; fill: none; stroke-dasharray: 7 5; marker-end: url(#arrow-model); }
       .note { font-size: 13px; fill: #334155; }
       .note-model { font-size: 13px; fill: #6d28d9; font-weight: 600; }
+      .pill { font-size: 12px; font-weight: 700; text-anchor: middle; }
     </style>
   </defs>
 
-  <rect width="1600" height="960" fill="#f8fafc"/>
+  <rect width="1600" height="990" fill="#f8fafc"/>
 
   <!-- Heading -->
   <text x="40" y="58" font-size="30" font-weight="800" fill="#0f172a">CHIRP architecture</text>
-  <text x="40" y="88" font-size="16" fill="#475569">From College Hockey News pages to a public win-probability dashboard, refreshed automatically every morning</text>
+  <text x="40" y="88" font-size="16" fill="#475569">Men's and women's D-I college hockey: from College Hockey News pages to a public win-probability dashboard, refreshed every morning</text>
 
   <!-- ===================== Lane 1: nightly refresh ===================== -->
-  <rect x="40" y="110" width="1520" height="220" rx="16" fill="#eef2ff" stroke="#c7d2fe" stroke-width="1.5"/>
+  <rect x="40" y="110" width="1520" height="225" rx="16" fill="#eef2ff" stroke="#c7d2fe" stroke-width="1.5"/>
   <text x="64" y="142" class="lane-label" fill="#3730a3">NIGHTLY REFRESH</text>
-  <text x="232" y="142" class="lane-sub">GitHub Actions, in the private data repo · every morning after 5 a.m. ET</text>
+  <text x="232" y="142" class="lane-sub">GitHub Actions, in the private data repo · every morning after 5 a.m. ET · each league in turn:</text>
+  <!-- league pills -->
+  <rect x="868" y="126" width="64" height="22" rx="11" fill="#3730a3"/>
+  <text x="900" y="142" class="pill" fill="#ffffff">Men's</text>
+  <text x="944" y="142" font-size="14" fill="#3730a3" font-weight="700">→</text>
+  <rect x="962" y="126" width="80" height="22" rx="11" fill="#3730a3"/>
+  <text x="1002" y="142" class="pill" fill="#ffffff">Women's</text>
 
   <!-- CHN (external source) -->
-  <rect x="60" y="165" width="180" height="100" rx="12" class="box" stroke-dasharray="6 4"/>
-  <text x="150" y="203" class="title" style="font-size: 15px">College Hockey News</text>
-  <text x="150" y="226" class="sub">schedules + box scores</text>
-  <text x="150" y="246" class="sub">(source, with permission)</text>
+  <rect x="60" y="168" width="180" height="104" rx="12" class="box" stroke-dasharray="6 4"/>
+  <text x="150" y="204" class="title" style="font-size: 15px">College Hockey News</text>
+  <text x="150" y="227" class="sub">men's + women's pages</text>
+  <text x="150" y="247" class="sub">(source, with permission)</text>
 
-  <rect x="268" y="165" width="180" height="100" rx="12" class="box"/>
-  <text x="358" y="203" class="title">Scrape</text>
-  <text x="358" y="226" class="sub">requests + BeautifulSoup</text>
-  <text x="358" y="246" class="sub">robots.txt · 2 s per page</text>
+  <rect x="268" y="168" width="180" height="104" rx="12" class="box"/>
+  <text x="358" y="204" class="title">Scrape</text>
+  <text x="358" y="227" class="sub">requests + BeautifulSoup</text>
+  <text x="358" y="247" class="sub">robots.txt · 2 s per page</text>
 
-  <rect x="476" y="165" width="180" height="100" rx="12" class="box" stroke="#d97706" stroke-width="2.5"/>
-  <text x="566" y="203" class="title">Validate</text>
-  <text x="566" y="226" class="sub">16 exact cross-checks</text>
-  <text x="566" y="246" class="sub" fill="#b45309">gate: fail = no update</text>
+  <rect x="476" y="168" width="180" height="104" rx="12" class="box" stroke="#d97706" stroke-width="2.5"/>
+  <text x="566" y="204" class="title">Validate</text>
+  <text x="566" y="227" class="sub">16 exact cross-checks</text>
+  <text x="566" y="247" class="sub" fill="#b45309">gate: fail = no update</text>
 
-  <rect x="684" y="165" width="180" height="100" rx="12" class="box"/>
-  <text x="774" y="203" class="title">Stable IDs</text>
-  <text x="774" y="226" class="sub">players across seasons,</text>
-  <text x="774" y="246" class="sub">spellings and transfers</text>
+  <rect x="684" y="168" width="180" height="104" rx="12" class="box"/>
+  <text x="774" y="204" class="title">Stable IDs</text>
+  <text x="774" y="227" class="sub">players across seasons;</text>
+  <text x="774" y="247" class="sub">D-I status per season</text>
 
-  <rect x="892" y="165" width="180" height="100" rx="12" class="box"/>
-  <text x="982" y="203" class="title">Load</text>
-  <text x="982" y="226" class="sub">PostgreSQL 17 (temporary)</text>
-  <text x="982" y="246" class="sub">one transaction</text>
+  <rect x="892" y="168" width="180" height="104" rx="12" class="box"/>
+  <text x="982" y="204" class="title">Load</text>
+  <text x="982" y="227" class="sub">PostgreSQL 17 (temporary)</text>
+  <text x="982" y="247" class="sub">one database per league</text>
 
-  <rect x="1100" y="165" width="180" height="100" rx="12" class="box"/>
-  <text x="1190" y="203" class="title">Predict</text>
-  <text x="1190" y="226" class="sub">win model v1</text>
-  <text x="1190" y="246" class="sub">logs the coming week</text>
+  <rect x="1100" y="168" width="180" height="104" rx="12" class="box"/>
+  <text x="1190" y="204" class="title">Predict</text>
+  <text x="1190" y="227" class="sub">the league's frozen model</text>
+  <text x="1190" y="247" class="sub">logs the coming week</text>
 
-  <rect x="1308" y="165" width="180" height="100" rx="12" class="box"/>
-  <text x="1398" y="203" class="title">Back up</text>
-  <text x="1398" y="226" class="sub">prediction log</text>
-  <text x="1398" y="246" class="sub">+ run history</text>
+  <rect x="1308" y="168" width="180" height="104" rx="12" class="box"/>
+  <text x="1398" y="204" class="title">Back up</text>
+  <text x="1398" y="227" class="sub">prediction log</text>
+  <text x="1398" y="247" class="sub">+ run history</text>
 
-  <path d="M240,215 L266,215" class="flow"/>
-  <path d="M448,215 L474,215" class="flow"/>
-  <path d="M656,215 L682,215" class="flow"/>
-  <path d="M864,215 L890,215" class="flow"/>
-  <path d="M1072,215 L1098,215" class="flow"/>
-  <path d="M1280,215 L1306,215" class="flow"/>
+  <path d="M240,220 L266,220" class="flow"/>
+  <path d="M448,220 L474,220" class="flow"/>
+  <path d="M656,220 L682,220" class="flow"/>
+  <path d="M864,220 L890,220" class="flow"/>
+  <path d="M1072,220 L1098,220" class="flow"/>
+  <path d="M1280,220 L1306,220" class="flow"/>
 
-  <!-- ===================== Middle: model card, data repo, legend ===================== -->
+  <!-- ===================== Middle: model cards, data repo, legend ===================== -->
   <!-- Legend -->
-  <text x="60" y="400" font-size="14" font-weight="700" fill="#0f172a">Key</text>
-  <path d="M60,428 L130,428" class="flow"/>
-  <text x="142" y="433" class="note">data flow</text>
-  <path d="M60,458 L130,458" class="model"/>
-  <text x="142" y="463" class="note">frozen model card</text>
-  <rect x="60" y="480" width="70" height="30" rx="6" fill="#ffffff" stroke="#334155" stroke-width="2" stroke-dasharray="6 4"/>
-  <text x="142" y="500" class="note">outside the platform / offline</text>
+  <text x="60" y="398" font-size="14" font-weight="700" fill="#0f172a">Key</text>
+  <path d="M60,424 L120,424" class="flow"/>
+  <text x="130" y="429" class="note">data flow</text>
+  <path d="M60,452 L120,452" class="model"/>
+  <text x="130" y="457" class="note">frozen model card</text>
+  <rect x="60" y="472" width="60" height="28" rx="6" fill="#ffffff" stroke="#334155" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="130" y="491" class="note">outside / offline</text>
 
-  <!-- Model building (offline) -->
-  <rect x="560" y="375" width="420" height="115" rx="12" fill="#faf5ff" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6 4"/>
-  <text x="770" y="408" class="title" fill="#5b21b6">Model building (offline, done once)</text>
-  <text x="770" y="432" class="sub">Jupyter notebooks 01–09 · time-series CV · scikit-learn</text>
-  <text x="770" y="452" class="sub">logistic regression: shot share + goal diff + home ice</text>
-  <text x="770" y="474" class="sub" fill="#6d28d9" font-weight="600">frozen card: win_model_v1.json</text>
+  <!-- Model cards (offline, built once per league) -->
+  <rect x="345" y="395" width="350" height="105" rx="12" fill="#faf5ff" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="520" y="424" class="title" fill="#5b21b6">Men's model (built offline)</text>
+  <text x="520" y="446" class="sub">notebooks/01–09 · time-series CV · scikit-learn</text>
+  <text x="520" y="465" class="sub">close-game shot share + goal diff + home ice</text>
+  <text x="520" y="486" class="sub" fill="#6d28d9" font-weight="600">frozen card: win_model_v1.json</text>
+
+  <rect x="715" y="395" width="390" height="105" rx="12" fill="#faf5ff" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="910" y="424" class="title" fill="#5b21b6">Women's model (built offline)</text>
+  <text x="910" y="446" class="sub">notebooks/women/01–09 · time-series CV · scikit-learn</text>
+  <text x="910" y="465" class="sub">shots for/game + adjusted goal diff + PDO + home ice</text>
+  <text x="910" y="486" class="sub" fill="#6d28d9" font-weight="600">frozen card: win_model_women_v1.json</text>
 
   <!-- CHIRP-data private repo -->
-  <rect x="1240" y="375" width="300" height="115" rx="12" fill="#ffffff" stroke="#0f172a" stroke-width="2.5"/>
-  <text x="1390" y="408" class="title">CHIRP-data</text>
-  <text x="1390" y="432" class="sub">private GitHub repo</text>
-  <text x="1390" y="452" class="sub">pages · tables · prediction log</text>
-  <text x="1390" y="472" class="sub">run history · logs</text>
+  <rect x="1240" y="385" width="300" height="120" rx="12" fill="#ffffff" stroke="#0f172a" stroke-width="2.5"/>
+  <text x="1390" y="416" class="title">CHIRP-data</text>
+  <text x="1390" y="439" class="sub">private GitHub repo</text>
+  <text x="1390" y="459" class="sub">men's at the root · women's in women/</text>
+  <text x="1390" y="479" class="sub">pages · tables · logs · prediction logs</text>
 
   <!-- commit arrow: Back up -> CHIRP-data -->
-  <path d="M1398,265 L1398,373" class="flow"/>
-  <text x="1410" y="292" class="note">commit, only if</text>
-  <text x="1410" y="310" class="note">validation passed</text>
+  <path d="M1398,272 L1398,383" class="flow"/>
+  <text x="1388" y="298" class="note" text-anchor="end">commit each league only</text>
+  <text x="1388" y="316" class="note" text-anchor="end">if its validation passed</text>
 
-  <!-- model card -> Predict -->
-  <path d="M900,375 C960,330 1120,320 1176,268" class="model"/>
-  <text x="1010" y="345" class="note-model">coefficients</text>
+  <!-- model cards -> Predict -->
+  <path d="M560,395 C640,340 1050,330 1168,276" class="model"/>
+  <path d="M950,395 C990,350 1130,330 1200,276" class="model"/>
+  <text x="440" y="380" class="note-model">coefficients</text>
 
   <!-- ===================== Lane 2: public site ===================== -->
-  <rect x="40" y="590" width="1520" height="300" rx="16" fill="#ecfdf5" stroke="#a7f3d0" stroke-width="1.5"/>
-  <text x="64" y="622" class="lane-label" fill="#047857">PUBLIC SITE</text>
-  <text x="182" y="622" class="lane-sub">Streamlit Community Cloud · chirp-hockey.streamlit.app</text>
+  <rect x="40" y="605" width="1520" height="310" rx="16" fill="#ecfdf5" stroke="#a7f3d0" stroke-width="1.5"/>
+  <text x="64" y="637" class="lane-label" fill="#047857">PUBLIC SITE</text>
+  <text x="182" y="637" class="lane-sub">Streamlit Community Cloud · chirp-hockey.streamlit.app</text>
 
   <!-- private container inside the app -->
-  <rect x="700" y="645" width="830" height="225" rx="14" fill="#ffffff" fill-opacity="0.55" stroke="#047857" stroke-width="1.5" stroke-dasharray="6 5"/>
-  <text x="720" y="856" font-size="13" font-weight="600" fill="#047857">Private: runs inside the app on 127.0.0.1, never reachable from outside</text>
+  <rect x="700" y="660" width="830" height="230" rx="14" fill="#ffffff" fill-opacity="0.55" stroke="#047857" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="720" y="876" font-size="13" font-weight="600" fill="#047857">Private: runs inside the app on 127.0.0.1, never reachable from outside</text>
 
   <!-- Visitors -->
-  <rect x="60" y="700" width="200" height="100" rx="12" class="box" stroke-dasharray="6 4"/>
-  <text x="160" y="738" class="title">Visitors</text>
-  <text x="160" y="761" class="sub">any browser</text>
-  <text x="160" y="781" class="sub">sleeps after 12 h idle</text>
+  <rect x="60" y="715" width="200" height="104" rx="12" class="box" stroke-dasharray="6 4"/>
+  <text x="160" y="752" class="title">Visitors</text>
+  <text x="160" y="775" class="sub">any browser</text>
+  <text x="160" y="795" class="sub">kept awake: 3 visits a day</text>
 
   <!-- Streamlit -->
-  <rect x="380" y="700" width="230" height="100" rx="12" class="box" stroke="#047857" stroke-width="2.5"/>
-  <text x="495" y="738" class="title">Streamlit dashboard</text>
-  <text x="495" y="761" class="sub">7 tabs · Altair charts</text>
-  <text x="495" y="781" class="sub" fill="#047857" font-weight="600">the only public part</text>
+  <rect x="375" y="715" width="240" height="104" rx="12" class="box" stroke="#047857" stroke-width="2.5"/>
+  <text x="495" y="752" class="title">Streamlit dashboard</text>
+  <text x="495" y="775" class="sub">Men | Women switch · 7 tabs</text>
+  <text x="495" y="795" class="sub" fill="#047857" font-weight="600">the only public part</text>
 
   <!-- FastAPI -->
-  <rect x="740" y="700" width="200" height="100" rx="12" class="box"/>
-  <text x="840" y="738" class="title">FastAPI</text>
-  <text x="840" y="761" class="sub">21 read-only endpoints</text>
-  <text x="840" y="781" class="sub">random API key</text>
+  <rect x="740" y="715" width="200" height="104" rx="12" class="box"/>
+  <text x="840" y="752" class="title">FastAPI</text>
+  <text x="840" y="775" class="sub">?league=men | women</text>
+  <text x="840" y="795" class="sub">21 endpoints · random key</text>
 
   <!-- PostgreSQL 18 -->
-  <rect x="1020" y="700" width="200" height="100" rx="12" class="box"/>
-  <text x="1120" y="738" class="title">PostgreSQL 18</text>
-  <text x="1120" y="761" class="sub">fresh on each start</text>
-  <text x="1120" y="781" class="sub">same loader as nightly</text>
+  <rect x="1020" y="715" width="200" height="104" rx="12" class="box"/>
+  <text x="1120" y="752" class="title">PostgreSQL 18</text>
+  <text x="1120" y="775" class="sub">hockey + hockey_women</text>
+  <text x="1120" y="795" class="sub">fresh on each start</text>
 
   <!-- Loader -->
-  <rect x="1300" y="700" width="200" height="100" rx="12" class="box"/>
-  <text x="1400" y="738" class="title">Load data</text>
-  <text x="1400" y="761" class="sub">read-only token</text>
-  <text x="1400" y="781" class="sub">checks every 10 min</text>
+  <rect x="1300" y="715" width="200" height="104" rx="12" class="box"/>
+  <text x="1400" y="752" class="title">Load data</text>
+  <text x="1400" y="775" class="sub">both leagues · read-only token</text>
+  <text x="1400" y="795" class="sub">checks every 10 min</text>
 
   <!-- CHIRP-data -> Loader -->
-  <path d="M1400,490 L1400,698" class="flow"/>
-  <text x="1412" y="560" class="note">download newest</text>
-  <text x="1412" y="578" class="note">tables + log</text>
+  <path d="M1400,505 L1400,713" class="flow"/>
+  <text x="1412" y="575" class="note">download newest</text>
+  <text x="1412" y="593" class="note">tables + logs</text>
 
-  <!-- model card -> FastAPI -->
-  <path d="M840,490 L840,698" class="model"/>
-  <text x="852" y="560" class="note-model">same frozen</text>
-  <text x="852" y="578" class="note-model">card</text>
+  <!-- model cards -> FastAPI -->
+  <path d="M560,500 C580,600 790,610 815,713" class="model"/>
+  <path d="M880,500 C880,600 868,640 865,713" class="model"/>
+  <text x="884" y="575" class="note-model">same frozen</text>
+  <text x="884" y="593" class="note-model">cards</text>
 
   <!-- lane 2 flows (right to left) -->
-  <path d="M1300,750 L1222,750" class="flow"/>
-  <path d="M1020,750 L942,750" class="flow"/>
-  <text x="981" y="740" class="sub">SQL</text>
-  <path d="M740,750 L612,750" class="flow"/>
-  <text x="676" y="740" class="sub">JSON</text>
-  <path d="M380,750 L262,750" class="flow"/>
-  <text x="321" y="740" class="sub">web page</text>
+  <path d="M1300,767 L1222,767" class="flow"/>
+  <path d="M1020,767 L942,767" class="flow"/>
+  <text x="981" y="757" class="sub">SQL</text>
+  <path d="M740,767 L617,767" class="flow"/>
+  <text x="678" y="757" class="sub">JSON</text>
+  <path d="M375,767 L262,767" class="flow"/>
+  <text x="318" y="757" class="sub">web page</text>
 
   <!-- Footer -->
-  <text x="40" y="928" font-size="14" fill="#475569">Code: public GitHub repo, tested on every push by GitHub Actions CI. Data: private repo only. The API, database and raw data are never public.</text>
+  <text x="40" y="950" font-size="14" fill="#475569">One codebase for both leagues: everything that differs lives in config/leagues.py. Code: public GitHub repo, tested on every push by GitHub Actions CI.</text>
+  <text x="40" y="972" font-size="14" fill="#475569">Data: private repo only. The API, databases and raw data are never public.</text>
 </svg>
