@@ -16,6 +16,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from config import leagues
 from src.dashboard import client
 from src.dashboard.logic import (
     DELTA_FORMAT,
@@ -35,6 +36,7 @@ from src.dashboard.logic import (
     meetings,
     next_game,
     side_by_side,
+    team_stats,
 )
 
 HOME_TEAM_NAME = "Boston University"
@@ -102,6 +104,7 @@ if st.query_params.get("league", "men") != LEAGUE:
     st.query_params["league"] = LEAGUE
 WOMEN = LEAGUE == "women"
 LEAGUE_WORD = "women's" if WOMEN else "men's"
+STATS = team_stats(leagues.get(LEAGUE).has_xg)  # the women's have no xG share row
 
 
 def cached(fn_name: str, *args):
@@ -126,9 +129,9 @@ def style_differences(df: pd.DataFrame, tones: list[str]) -> object:
     css = {"better": color_text(colors["up"]), "worse": color_text(colors["down"]), "": ""}
     styler = df.style.apply(lambda col: [css[t] for t in tones], subset=["Difference"])
     for kind, pattern in DELTA_FORMAT.items():
-        rows = [i for i, s in enumerate(TEAM_STATS) if s.kind == kind]
+        rows = [i for i, s in enumerate(STATS) if s.kind == kind]
         styler = styler.format(pattern, subset=pd.IndexSlice[rows, ["Difference"]], na_rep="")
-    text_rows = [i for i, s in enumerate(TEAM_STATS) if s.kind == "text"]
+    text_rows = [i for i, s in enumerate(STATS) if s.kind == "text"]
     return styler.format(lambda v: "", subset=pd.IndexSlice[text_rows, ["Difference"]])
 
 
@@ -757,14 +760,14 @@ with tab_team:
         )
     st.dataframe(
         style_differences(
-            pd.DataFrame(comparison_rows(window, season_totals)).rename(
+            pd.DataFrame(comparison_rows(window, season_totals, STATS)).rename(
                 columns={"Last N": window_label}
             ),
-            difference_tones(window, season_totals) if season_totals else [],
+            difference_tones(window, season_totals, STATS) if season_totals else [],
         ),
         hide_index=True,
         placeholder="",  # no difference to show (text stats, players who sat out)
-        height=36 * (len(TEAM_STATS) + 1) + 3,  # every row, no inner scrolling
+        height=36 * (len(STATS) + 1) + 3,  # every row, no inner scrolling
         width="stretch",
     )
 
@@ -1063,14 +1066,16 @@ with tab_h2h:
             st.dataframe(
                 style_better(
                     pd.DataFrame(
-                        side_by_side(window, home_form["window"], scouted["name"], home_name)
+                        side_by_side(
+                            window, home_form["window"], scouted["name"], home_name, STATS
+                        )
                     ),
                     mine=home_name,
                     theirs=scouted["name"],
                 ),
                 hide_index=True,
                 width="stretch",
-                height=36 * (len(TEAM_STATS) + 1) + 3,
+                height=36 * (len(STATS) + 1) + 3,
             )
         past = meetings(home_schedule, scouted["team_id"])
         st.subheader("Meetings this season")

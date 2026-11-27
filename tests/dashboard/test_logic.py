@@ -242,3 +242,11 @@ def test_differences_sort_by_value_not_text():
 )
 def test_bucket_label(low, high, label):
     assert bucket_label(low, high) == label
+
+
+def test_team_stats_drop_xg_without_expected_goals():
+    from src.dashboard.logic import team_stats
+
+    assert team_stats(True) == TEAM_STATS
+    keys = [s.key for s in team_stats(False)]
+    assert "xg_share" not in keys and len(keys) == len(TEAM_STATS) - 1

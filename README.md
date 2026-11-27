@@ -18,7 +18,7 @@ choice is kept in the link (`?league=women`). The dashboard has seven tabs:
 
 | Tab | What it shows |
 |---|---|
-| **Team** | The scouted team over its last N games next to its season: 20 stats, colored better or worse, and goal differential by game against what the play said (expected goals for men's, shot share for women's, the measure CHN publishes for each) |
+| **Team** | The scouted team over its last N games next to its season: 20 stats (19 for women's, no xG share), colored better or worse, and goal differential by game against what the play said (expected goals for men's, shot share for women's, the measure CHN publishes for each) |
 | **Players** | Skaters and goalies over the same games, with season numbers alongside, and the likely starting goalie |
 | **vs your team** | Both teams side by side on every stat, and this season's meetings |
 | **Win probability** | Your team's chance against the next opponent, or any team at a venue you pick, with what drives it |

@@ -59,6 +59,12 @@ TEAM_STATS = [
     Stat("away_record", "Away", "text", score=record_pct),
 ]
 LOWER_IS_BETTER = [s.label for s in TEAM_STATS if not s.higher_is_better]
+XG_STATS = {"xg_share"}
+
+
+def team_stats(has_xg: bool) -> list[Stat]:
+    """The team stats a league can show: no xG rows where CHN publishes no expected goals."""
+    return [s for s in TEAM_STATS if has_xg or s.key not in XG_STATS]
 
 
 def comparable(stat: Stat, value: Any) -> float | None:

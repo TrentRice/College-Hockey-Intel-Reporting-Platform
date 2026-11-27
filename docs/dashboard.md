@@ -41,7 +41,7 @@ save. Stop the Docker one first (`docker compose stop dashboard`), because both 
 **Team tab**
 - Six headline numbers for the last N games, each with its change from the season so far.
   Green or red shows whether the change is good or bad; "no change" is neutral.
-- A full table: last N, season, and the difference for 20 stats. The difference is
+- A full table: last N, season, and the difference for 20 stats (19 for women's: no xG share). The difference is
   **green when the last N games are better** than the season and **red when worse**. Higher is
   better except for goals against, shots against, times shorthanded and PIM per game, where
   lower is better. It also keeps its + or − sign, so color isn't the only signal.
