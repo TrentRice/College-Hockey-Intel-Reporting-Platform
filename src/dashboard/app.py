@@ -883,7 +883,8 @@ with tab_team:
     if has_xg:
         chart = chart.resolve_scale(color="shared")
     else:  # bars and the zero line share the goal scale by domain; shot share gets its own
-        chart = chart.resolve_scale(color="shared", y="independent")
+        # (a chart with independent axes loses the default height and collapses: set it)
+        chart = chart.resolve_scale(color="shared", y="independent").properties(height=300)
     st.altair_chart(chart, width="stretch")
     if has_xg:
         caption = (
