@@ -6,6 +6,12 @@ CHIRP's public dashboard runs for free on **Streamlit Community Cloud**. The dat
 **private GitHub repo** (`CHIRP-data`), and a **GitHub Actions** job in that repo refreshes it
 every morning. No server, and the Mac doesn't need to be on.
 
+**Men's and women's:** the data repo holds the men's at its root and the women's under
+`women/`. The nightly job refreshes both, one after the other, and commits each league on
+its own terms. The app loads both into its private Postgres (one database each), and the
+dashboard's Men | Women switch picks between them. If the women's data fails to load, the
+men's site is unaffected.
+
 ```
                    PRIVATE: TrentRice/CHIRP-data                       PUBLIC
   ┌───────────────────────────────────────────────────┐

@@ -5,12 +5,12 @@ from __future__ import annotations
 import datetime as dt
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Query, Request
 
-from src.api.db import resolve_season
+from src.api.db import resolve_season, win_card
 from src.api.models import Rankings
 from src.api.params import Conn, SeasonQ, team_ref
-from src.models.win_model import RANK_MIN_GAMES, rank_teams
+from src.models.win_model import rank_teams, spec
 
 router = APIRouter(prefix="/rankings", tags=["rankings"])
 
@@ -21,18 +21,17 @@ def rankings(
     conn: Conn,
     season: SeasonQ = None,
     as_of: Annotated[dt.date | None, Query(description="Use games before this date (default: today)")] = None,
-    min_games: Annotated[int, Query(ge=1, le=40, description="Games needed to be ranked")] = RANK_MIN_GAMES,
+    min_games: Annotated[int | None, Query(ge=1, le=40, description="Games needed to be ranked (default: the model's own minimum: men's 5, women's 6)")] = None,
     limit: Annotated[int | None, Query(ge=1, description="Top N only (default: all ranked)")] = None,
 ) -> dict:
     """Who the model says is best: each team's chance to beat an average team on neutral
     ice, from its season so far. Ordering agrees with every neutral-site prediction. Not
     adjusted for strength of schedule. Movement compares with the ranking a week earlier."""
-    card = request.app.state.win_card
-    if card is None:
-        raise HTTPException(503, request.app.state.win_card_error)
+    card = win_card(request)
     season = resolve_season(conn, season)
     before = as_of or dt.date.today()
     earlier = before - dt.timedelta(days=7)
+    min_games = min_games or spec(card).rank_min_games
     now = rank_teams(conn, card, season, before, min_games)
     then = rank_teams(conn, card, season, earlier, min_games)
     prev = {r["team_id"]: r["rank"] for r in then["teams"]}
@@ -45,7 +44,9 @@ def rankings(
             "record": f"{r['wins']}-{r['losses']}-{r['ties']}",
             "games_played": r["games_played"], "previous_rank": p,
             "change": None if p is None else p - r["rank"],
-            "close_shot_share": r["close_shot_share"], "goal_diff_per_game": r["goal_diff_per_game"],
+            # the model's inputs, for reference (men's v1 or the women's model)
+            **{k: r.get(k) for k in ("close_shot_share", "goal_diff_per_game", "shots_for_per_game",
+                                     "adj_goal_diff_per_game", "pdo")},
         })  # fmt: skip
     return {
         "season": season, "model": card["name"], "as_of": before, "compared_to": earlier,

@@ -47,14 +47,21 @@ cloud-requirements:
 DATA_REPO ?= ../CHIRP-data
 
 # Get the latest data from the private data repo into data/ and load it into the local
-# database: the tables, then the prediction log exactly as the nightly job left it
+# databases, both leagues (men's at the repo's root, women's under women/): the tables, then
+# each prediction log exactly as the nightly job left it
 data-pull: db-up
 	git -C "$(DATA_REPO)" pull -q
-	rsync -a --exclude .gitkeep "$(DATA_REPO)/raw/" data/raw/
-	rsync -a --delete --exclude .gitkeep --exclude validation/ "$(DATA_REPO)/processed/" data/processed/
-	rsync -a "$(DATA_REPO)/backups/" data/backups/
-	uv run python -m src.db.load
-	uv run python -m src.pipeline.backup --restore --replace
+	@for lg in men women; do \
+	  if [ $$lg = men ]; then src="$(DATA_REPO)"; dst=data; else src="$(DATA_REPO)/women"; dst=data/women; fi; \
+	  [ -d "$$src/processed" ] || continue; \
+	  echo "== $$lg"; mkdir -p "$$dst/raw" "$$dst/processed" "$$dst/backups"; \
+	  rsync -a --exclude .gitkeep --exclude women/ "$$src/raw/" "$$dst/raw/"; \
+	  rsync -a --delete --exclude .gitkeep --exclude validation/ "$$src/processed/" "$$dst/processed/"; \
+	  [ -d "$$src/backups" ] && rsync -a "$$src/backups/" "$$dst/backups/"; \
+	  CHIRP_LEAGUE=$$lg uv run python -m src.db.load || exit 1; \
+	  if ls "$$dst"/backups/predictions_*.csv.gz >/dev/null 2>&1; then \
+	    CHIRP_LEAGUE=$$lg uv run python -m src.pipeline.backup --restore --replace || exit 1; fi; \
+	done
 
 # One time only, already done: build the data repo's first version from data/
 data-repo:

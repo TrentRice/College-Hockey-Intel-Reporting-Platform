@@ -508,11 +508,21 @@ class ModelInputs(BaseModel):
     team: TeamRef
     games_played: int = Field(description="D-I games this season before the game's date")
     close_shot_share: float | None = Field(
-        description="Share of shots on goal in periods that started tied or within one goal"
+        default=None,
+        description="Men's model: share of shots on goal in periods that started tied or within one goal",
     )
     goal_diff_per_game: float | None = Field(
-        description="(Goals for − empty-net goals − goals against) ÷ games"
+        default=None,
+        description="Men's model: (goals for − empty-net goals − goals against) ÷ games. "
+        "Women's: the raw goal differential per game, for reference",
     )
+    shots_for_per_game: float | None = Field(default=None, description="Women's model: shots on goal ÷ games")
+    adj_goal_diff_per_game: float | None = Field(
+        default=None,
+        description="Women's model: goal differential per game + the opponents' average goal "
+        "differential per game (each as of the day they played)",
+    )
+    pdo: float | None = Field(default=None, description="Women's model: shooting % (no empty-net goals) + save %")
 
 
 class Prediction(BaseModel):
@@ -525,11 +535,15 @@ class Prediction(BaseModel):
     home_ice: bool = Field(description="False at a neutral site: no home edge applied")
     factors: dict[str, float] = Field(
         description="How much each factor moves the home team's chance: the probability minus "
-        "what it would be with that factor even (home_ice, close_shot_share, goal_diff_per_game)"
+        "what it would be with that factor even: home_ice plus the model's inputs (men's: "
+        "close_shot_share, goal_diff_per_game; women's: shots_for_per_game, "
+        "adj_goal_diff_per_game, pdo)"
     )
     home: ModelInputs
     away: ModelInputs
-    reliable: bool = Field(description="Both teams have played at least 3 games (the warm-up)")
+    reliable: bool = Field(
+        description="Both teams have played enough games for the model: men's 3, women's 6"
+    )
     note: str | None
 
 
@@ -602,8 +616,11 @@ class RankedTeam(BaseModel):
     games_played: int
     previous_rank: int | None = Field(description="Rank a week earlier; None if not ranked then")
     change: int | None = Field(description="Places moved up (+) or down (-) since a week earlier")
-    close_shot_share: float = Field(description="Model input, for reference")
-    goal_diff_per_game: float = Field(description="Model input, for reference")
+    close_shot_share: float | None = Field(default=None, description="Men's model input, for reference")
+    goal_diff_per_game: float | None = Field(default=None, description="Men's model input, for reference")
+    shots_for_per_game: float | None = Field(default=None, description="Women's model input")
+    adj_goal_diff_per_game: float | None = Field(default=None, description="Women's model input")
+    pdo: float | None = Field(default=None, description="Women's model input")
 
 
 class Rankings(BaseModel):

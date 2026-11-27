@@ -39,6 +39,7 @@ import psycopg
 import requests
 import uvicorn
 
+from config import leagues
 from config.settings import settings
 from src.cloud.runs import import_runs
 from src.db.load import build_tables, load_database
@@ -52,7 +53,9 @@ PG_DB = "hockey"
 GITHUB_API = "https://api.github.com"
 CHECK_EVERY = 10 * 60  # seconds between "is there new data?" checks
 # What the app needs from the data repo (paths inside it). The raw pages stay behind.
-WANTED = ("processed/chn/", "processed/ids/", "backups/", "pipeline_runs.csv")
+LEAGUE_FILES = ("processed/chn/", "processed/ids/", "backups/", "pipeline_runs.csv")
+# Men's at the data repo's root, women's under women/ (config/leagues.py)
+WANTED = LEAGUE_FILES + tuple(f"women/{p}" for p in LEAGUE_FILES)
 
 
 # ----------------------------------------------------------------------------
@@ -128,7 +131,8 @@ class LocalData:
         self.path = path
 
     def latest(self) -> str:
-        files = [self.path / "pipeline_runs.csv", *(self.path / "processed").rglob("*.csv")]
+        files = [self.path / "pipeline_runs.csv", *(self.path / "processed").rglob("*.csv"),
+                 self.path / "women/pipeline_runs.csv", *(self.path / "women/processed").rglob("*.csv")]
         return str(max((f.stat().st_mtime_ns for f in files if f.exists()), default=0))
 
     def fetch(self, version: str, dest: Path) -> None:
@@ -191,17 +195,18 @@ def start_postgres(work: Path) -> str:
     )
     with psycopg.connect(f"postgresql://{PG_USER}@127.0.0.1:{port}/postgres",
                          autocommit=True) as conn:
-        conn.execute(f"CREATE DATABASE {PG_DB}")
+        for league in leagues.LEAGUES.values():  # one database per league
+            conn.execute(f"CREATE DATABASE {league.database}")
     return f"postgresql://{PG_USER}@127.0.0.1:{port}/{PG_DB}"
 
 
-def start_api(database_url: str, api_key: str) -> tuple[int, uvicorn.Server]:
+def start_api(database_urls: dict[str, str], api_key: str) -> tuple[int, uvicorn.Server]:
     """The CHIRP API on 127.0.0.1 in a background thread. Returns its port and server."""
     from src.api.main import create_app
 
     port = free_port()
     server = uvicorn.Server(uvicorn.Config(
-        create_app(database_url=database_url, api_key=api_key),
+        create_app(database_urls=database_urls, api_key=api_key),
         host="127.0.0.1", port=port, log_level="warning",
     ))
     threading.Thread(target=server.run, name="chirp-api", daemon=True).start()
@@ -225,8 +230,26 @@ def stop_postgres(work: Path) -> None:
 # ----------------------------------------------------------------------------
 
 
+def league_urls(database_url: str) -> dict[str, str]:
+    """Each league's database on the app's Postgres (the men's URL is `database_url`)."""
+    return {key: leagues.database_url(database_url, lg) for key, lg in leagues.LEAGUES.items()}
+
+
+def load_all(database_url: str, snapshot: Path) -> None:
+    """Load the men's data (the snapshot's root) and the women's (its women/ folder). A
+    women's problem is logged and skipped, so the men's site never goes down with it."""
+    urls = league_urls(database_url)
+    load_snapshot(urls["men"], snapshot)
+    women = snapshot / "women"
+    if (women / "processed/chn").is_dir():
+        try:
+            load_snapshot(urls["women"], women)
+        except Exception:
+            log.exception("Women's data failed to load; the men's site is unaffected")
+
+
 def load_snapshot(database_url: str, data_dir: Path) -> None:
-    """Load one downloaded snapshot: the hockey tables, then the prediction log and the run
+    """Load one league's snapshot: the hockey tables, then the prediction log and the run
     history (each replaced as a whole, in its own transaction)."""
     load_database(database_url, build_tables(data_dir / "processed/chn", data_dir / "processed/ids"))
     if found := backups(data_dir / "backups"):
@@ -264,7 +287,7 @@ class Backend:
         # The dashboard reads the key from settings and the address from CHIRP_API_URL
         key = secrets.token_urlsafe(32)
         settings.api_key = key
-        port, backend._api = start_api(database_url, key)
+        port, backend._api = start_api(league_urls(database_url), key)
         backend.api_url = f"http://127.0.0.1:{port}"
         os.environ["CHIRP_API_URL"] = backend.api_url
         log.warning("CHIRP backend ready in %.0fs (data %s)", time.monotonic() - started,
@@ -281,7 +304,7 @@ class Backend:
         dest = WORK_DIR / f"data-{int(time.time() * 1000)}"
         try:
             self.source.fetch(version, dest)
-            load_snapshot(self.database_url, dest)
+            load_all(self.database_url, dest)
             self.version, self.error = version, None
         finally:
             shutil.rmtree(dest, ignore_errors=True)

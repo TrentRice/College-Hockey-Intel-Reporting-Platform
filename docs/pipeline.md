@@ -5,6 +5,13 @@ GitHub Actions, in the private `CHIRP-data` repo ([cloud.md](cloud.md)). Code:
 [src/pipeline/](../src/pipeline/), plus [src/cloud/nightly.py](../src/cloud/nightly.py) for
 the GitHub job.
 
+**Two leagues, one pipeline.** `CHIRP_LEAGUE` picks the league for every step
+([config/leagues.py](../config/leagues.py)): men's by default, `CHIRP_LEAGUE=women` (or
+`make ... LEAGUE=women`) for women's. Each league has its own files (`data/`,
+`data/women/`), database (`hockey`, `hockey_women`), run history, logs, prediction log and
+backups. The nightly job runs the men's, then the women's, and saves each on its own, so a
+women's failure never blocks the men's update (or the reverse).
+
 ```
 schedules ─► box scores ─► parse ─► validate ─► ids ─► load ─► predict ─► backup
  (scrape)    (new only)            (gate)              (one transaction) (log the week) (prediction log)

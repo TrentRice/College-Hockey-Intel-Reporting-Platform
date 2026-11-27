@@ -2,8 +2,9 @@
 # deploy/data-repo/ in the public code repo; see docs/cloud.md there). Running here keeps
 # the logs private: they contain data excerpts, and a public repo's Actions logs are public.
 #
-# Each run checks out the public code, uses this repo as its data/ folder, refreshes against a
-# throwaway Postgres, and commits the results here. The Streamlit app picks them up within
+# Each run checks out the public code, uses this repo as its data/ folder, refreshes the men's
+# (this repo's root) and then the women's (women/) against a throwaway Postgres, and commits
+# each league's results here on its own terms, so one league's failure never blocks the other. The Streamlit app picks them up within
 # about 10 minutes. Same rules as the Mac's scheduler (src/pipeline/scheduler.py): after
 # 5 a.m. Eastern, Mondays only May-August, and up to 3 tries a day an hour or more apart.
 name: Nightly refresh
@@ -66,7 +67,7 @@ jobs:
       # seconds old and nothing would be re-downloaded. Mark them old; pages of finished
       # seasons are still reused (the scraper checks that separately).
       - name: Mark saved schedule pages as old
-        run: find data/raw/chn/schedules -name '*.html' -exec touch -d '2000-01-01' {} +
+        run: find data -path '*/raw/chn/schedules/*.html' -exec touch -d '2000-01-01' {} +
 
       - uses: astral-sh/setup-uv@v6
         with:
@@ -78,32 +79,48 @@ jobs:
         working-directory: code
         run: uv sync --locked --no-default-groups --group pipeline
 
-      - name: Refresh
-        id: refresh
+      - name: Refresh men's
+        id: men
         continue-on-error: true
         working-directory: code
         run: uv run --no-sync python -m src.cloud.nightly ${{ inputs.force && '--force' || '' }}
 
-      # After a successful run, save everything. Otherwise save only the run history and the
-      # logs, so data that failed validation never reaches the app.
+      - name: Refresh women's
+        id: women
+        continue-on-error: true
+        working-directory: code
+        env:
+          CHIRP_LEAGUE: women
+        run: uv run --no-sync python -m src.cloud.nightly ${{ inputs.force && '--force' || '' }}
+
+      # Each league on its own terms: after a successful run, everything of that league;
+      # otherwise only its run history and logs, so data that failed validation never reaches
+      # the app. Men's files are this repo's root (except women/), women's are women/.
       - name: Save to this repo
         if: always()
         working-directory: data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ "${{ steps.refresh.outcome }}" = "success" ]; then
-            git add -A
+          if [ "${{ steps.men.outcome }}" = "success" ]; then
+            git add -A -- . ':!women'
           else
             git add -- pipeline_runs.csv || true
             git add -- logs || true
           fi
+          if [ "${{ steps.women.outcome }}" = "success" ]; then
+            git add -A -- women
+          else
+            git add -- women/pipeline_runs.csv || true
+            git add -- women/logs || true
+          fi
           if git diff --cached --quiet; then echo "Nothing new to save."; exit 0; fi
-          git commit -q -m "Nightly refresh $(date +%F) (${{ steps.refresh.outcome }})"
+          git commit -q -m "Nightly refresh $(date +%F) (men's ${{ steps.men.outcome }}, women's ${{ steps.women.outcome }})"
           git push -q
 
-      - name: Mark the run failed if the refresh failed
-        if: steps.refresh.outcome != 'success'
+      - name: Mark the run failed if a refresh failed
+        if: steps.men.outcome != 'success' || steps.women.outcome != 'success'
         run: |
-          echo "The refresh failed. See the Refresh step above and logs/refresh/ in this repo."
+          echo "Men's: ${{ steps.men.outcome }}. Women's: ${{ steps.women.outcome }}."
+          echo "See that Refresh step above, and logs/refresh/ (men's) or women/logs/refresh/ in this repo."
           exit 1

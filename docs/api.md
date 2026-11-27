@@ -3,6 +3,13 @@
 A read-only REST API over the hockey database ([db/schema.sql](../db/schema.sql)), built with
 FastAPI. Code: [src/api/](../src/api/).
 
+**Two leagues.** Every endpoint takes `?league=men` (the default) or `?league=women`. Each
+league has its own database (`hockey`, `hockey_women`) and win model (`win_model_v1`,
+`win_model_women_v1`); the prediction, matchup and rankings endpoints use the league's model,
+and their inputs differ: men's `close_shot_share` and `goal_diff_per_game`, women's
+`shots_for_per_game`, `adj_goal_diff_per_game` and `pdo`. A server without a league's data
+answers that league with 503.
+
 ## Running it
 
 **In Docker (normal use):**

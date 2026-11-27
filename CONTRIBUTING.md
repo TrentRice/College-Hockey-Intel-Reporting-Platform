@@ -27,7 +27,8 @@ the private `CHIRP-data` repo, which GitHub Actions refreshes every morning
 | Command | What it does |
 |---|---|
 | `make up` / `make down` | Start / stop the local stack in Docker (data is kept) |
-| `make data-pull` | Latest data from the private data repo, loaded into the local database |
+| `make data-pull` | Latest data from the private data repo, both leagues, loaded into the local databases |
+| `make <target> LEAGUE=women` | Any pipeline command for the women's league (`refresh`, `validate`, `load`, `predict`, `runs`...) |
 | `make logs` | Follow the containers' logs |
 | `make refresh` | Scrape CHN from the Mac and load the result (rarely needed: the nightly job does this) |
 | `make runs` | Refresh runs recorded in the local database (the nightly job's are in `CHIRP-data`) |

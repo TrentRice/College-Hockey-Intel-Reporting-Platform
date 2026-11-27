@@ -1,5 +1,6 @@
 """
-Prediction log: every D-I game's win probability, saved before the game (win model v1).
+Prediction log: every D-I game's win probability, saved before the game, by the league's
+frozen model (CHIRP_LEAGUE; config/leagues.py): win_model_v1 or win_model_women_v1.
 
   uv run python -m src.pipeline.predict      # or `make predict`; the nightly refresh runs it
                                              # after the load
@@ -28,10 +29,12 @@ from zoneinfo import ZoneInfo
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
+from config import leagues
 from config.settings import settings
 from src.db.load import refresh_guard
-from src.models.win_model import load_card, predict_game
+from src.models.win_model import card_path, load_card, predict_game
 
 PREDICTIONS_SQL = Path(__file__).resolve().parents[2] / "db" / "predictions.sql"
 DAYS_AHEAD = 7
@@ -59,12 +62,12 @@ INSERT INTO predictions.game_predictions AS p (
     game_id, model, season, game_date, home_team_id, away_team_id, neutral,
     home_win_probability, home_games_played, away_games_played,
     home_close_shot_share, away_close_shot_share,
-    home_goal_diff_per_game, away_goal_diff_per_game,
+    home_goal_diff_per_game, away_goal_diff_per_game, home_inputs, away_inputs,
     reliable, backfilled, logged_on)
 VALUES (
     %(game_id)s, %(model)s, %(season)s, %(game_date)s, %(home_team_id)s, %(away_team_id)s,
     %(neutral)s, %(p)s, %(hgp)s, %(agp)s, %(hcs)s, %(acs)s, %(hgd)s, %(agd)s,
-    %(reliable)s, %(backfilled)s, %(today)s)
+    %(hin)s, %(ain)s, %(reliable)s, %(backfilled)s, %(today)s)
 ON CONFLICT (game_id, model) DO UPDATE SET
     season = EXCLUDED.season, game_date = EXCLUDED.game_date,
     home_team_id = EXCLUDED.home_team_id, away_team_id = EXCLUDED.away_team_id,
@@ -74,10 +77,19 @@ ON CONFLICT (game_id, model) DO UPDATE SET
     away_close_shot_share = EXCLUDED.away_close_shot_share,
     home_goal_diff_per_game = EXCLUDED.home_goal_diff_per_game,
     away_goal_diff_per_game = EXCLUDED.away_goal_diff_per_game,
+    home_inputs = EXCLUDED.home_inputs, away_inputs = EXCLUDED.away_inputs,
     reliable = EXCLUDED.reliable, logged_on = EXCLUDED.logged_on, updated_at = now()
 WHERE p.logged_on < EXCLUDED.game_date      -- locked once written on or after game day
 RETURNING (xmax = 0) AS inserted
 """
+
+
+def model_inputs(card: dict, inputs: dict) -> dict:
+    """The side's model inputs and games played, for the log's JSON columns."""
+    from src.models.win_model import spec
+
+    return {"games_played": inputs["games_played"],
+            **{key: inputs.get(key) for key in spec(card).inputs.values()}}
 
 
 def eastern_today() -> dt.date:
@@ -89,10 +101,12 @@ def log_predictions(
     today: dt.date | None = None,
     days_ahead: int = DAYS_AHEAD,
     backfill: bool = True,
+    card: dict | None = None,
 ) -> dict[str, int]:
     """Write the log; returns counts of what happened."""
     today = today or eastern_today()
-    card = load_card()
+    card = card or load_card(card_path(leagues.current()))
+    men = card["name"] == "win_model_v1"
     counts = {"logged": 0, "updated": 0, "locked": 0, "backfilled": 0}
     with psycopg.connect(database_url) as conn:
         conn.execute(PREDICTIONS_SQL.read_text())
@@ -112,8 +126,11 @@ def log_predictions(
                 "away_team_id": g["away_team_id"], "neutral": g["is_neutral"],
                 "p": pred["home_win_probability"],
                 "hgp": h["games_played"], "agp": a["games_played"],
-                "hcs": h["close_shot_share"], "acs": a["close_shot_share"],
-                "hgd": h["goal_diff_per_game"], "agd": a["goal_diff_per_game"],
+                # the men's v1 columns (None for the women's model, whose inputs differ)
+                "hcs": h.get("close_shot_share"), "acs": a.get("close_shot_share"),
+                "hgd": h["goal_diff_per_game"] if men else None,
+                "agd": a["goal_diff_per_game"] if men else None,
+                "hin": Jsonb(model_inputs(card, h)), "ain": Jsonb(model_inputs(card, a)),
                 "reliable": pred["reliable"], "backfilled": is_backfill, "today": today,
             }).fetchone()  # fmt: skip
             if row is None:

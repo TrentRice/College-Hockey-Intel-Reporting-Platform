@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, Query, Request
 
-from src.api.db import fetch_all, fetch_one, require_team, resolve_season
+from src.api.db import fetch_all, fetch_one, require_team, resolve_season, win_card
 from src.api.models import BoxScore, GamePrediction, GameSummary, MatchupPrediction, Page
 from src.api.params import Conn, PagingQ, SeasonQ, mmss, page, player_ref, team_ref
 from src.models.win_model import predict_game, predict_matchup
@@ -217,9 +217,7 @@ def game_prediction(
     """The home team's chance of winning, from each team's season so far (games before this
     game's date). Works for upcoming and played games; for a played game it shows what the
     model would have said beforehand."""
-    card = request.app.state.win_card
-    if card is None:
-        raise HTTPException(503, request.app.state.win_card_error)
+    card = win_card(request)
     row = fetch_one(
         conn,
         f"""
@@ -273,9 +271,7 @@ def matchup_prediction(
 ) -> dict:
     """The home side's chance of beating the away side, from each team's season so far,
     whether or not they're scheduled to play. Same model and rules as a game's prediction."""
-    card = request.app.state.win_card
-    if card is None:
-        raise HTTPException(503, request.app.state.win_card_error)
+    card = win_card(request)
     if home_team_id == away_team_id:
         raise HTTPException(422, "Pick two different teams")
     season = resolve_season(conn, season)

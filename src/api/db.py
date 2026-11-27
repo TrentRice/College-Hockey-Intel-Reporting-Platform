@@ -7,10 +7,10 @@ an endpoint can't change data even by mistake.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Any
+from typing import Annotated, Any, Literal
 
 import psycopg
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Query, Request
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
@@ -27,10 +27,29 @@ def make_pool(database_url: str) -> ConnectionPool:
     )
 
 
-def get_conn(request: Request) -> Iterator[psycopg.Connection]:
-    """FastAPI dependency: one pooled connection per request."""
-    with request.app.state.pool.connection() as conn:
+LeagueQ = Annotated[
+    Literal["men", "women"],
+    Query(description="men (default) or women: each league has its own database and model"),
+]
+
+
+def get_conn(request: Request, league: LeagueQ = "men") -> Iterator[psycopg.Connection]:
+    """FastAPI dependency: one pooled connection per request, from the league's database.
+    Every endpoint takes ?league= through this."""
+    pool = request.app.state.pools.get(league)
+    if pool is None:
+        raise HTTPException(503, f"The {league}'s data isn't loaded on this server")
+    request.state.league = league
+    with pool.connection() as conn:
         yield conn
+
+
+def win_card(request: Request) -> dict[str, Any]:
+    """The request's league's frozen win model card (503 if it couldn't be loaded)."""
+    card, error = request.app.state.win_cards[getattr(request.state, "league", "men")]
+    if card is None:
+        raise HTTPException(503, error)
+    return card
 
 
 def fetch_all(

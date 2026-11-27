@@ -7,13 +7,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 
+from config import leagues
 from src.api.db import fetch_all, fetch_one, resolve_season
 from src.api.models import LoggedPrediction, Page, PredictionSummary
 from src.api.params import Conn, PagingQ, SeasonQ, team_ref
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
 
-MODEL_DEFAULT = "win_model_v1"
+MODEL_DEFAULT = None  # the request's league's model (win_model_v1 or win_model_women_v1)
 CAL_EDGES = [0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 1.0]  # favorite's chance
 
 LOG_SQL = """
@@ -69,7 +70,7 @@ def query(conn, season, model, team_id, played, backfilled, reliable_only):
 
 
 TeamQ = Annotated[int | None, Query(ge=1, description="Only games involving this team")]
-ModelQ = Annotated[str, Query(description="Model version")]
+ModelQ = Annotated[str | None, Query(description="Model version (default: the league's model)")]
 BackfilledQ = Annotated[
     bool, Query(description="Include backfilled rows (not logged before the game)")
 ]
@@ -79,8 +80,14 @@ ReliableQ = Annotated[
 ]
 
 
+def league_model(request: Request) -> str:
+    """The request's league's model name (config/leagues.py)."""
+    return leagues.get(getattr(request.state, "league", "men")).model
+
+
 @router.get("", response_model=Page[LoggedPrediction], summary="The prediction log")
 def prediction_log(
+    request: Request,
     conn: Conn,
     paging: PagingQ,
     season: SeasonQ = None,
@@ -92,6 +99,7 @@ def prediction_log(
 ) -> dict:
     """Logged predictions, newest first, each with the result once the game is played."""
     season = resolve_season(conn, season)
+    model = model or league_model(request)
     rows = query(conn, season, model, team_id, played, backfilled, reliable_only)
     total = len(rows)
     items = [shape(r) for r in rows[paging.offset : paging.offset + paging.limit]]
@@ -110,10 +118,11 @@ def prediction_summary(
 ) -> dict:
     """Accuracy, log loss and calibration over the decided games in the log, next to a
     home-ice-only baseline. Ties are excluded: the model predicts a decided game."""
+    model = model or league_model(request)
     season = resolve_season(conn, season)
     rows = [shape(r) for r in query(conn, season, model, team_id, None, backfilled, reliable_only)]
     graded = [r for r in rows if r["result"] in ("home", "away")]
-    card = request.app.state.win_card
+    card, _ = request.app.state.win_cards[getattr(request.state, "league", "men")]
     home_edge = None if card is None else 1 / (1 + math.exp(-card["coefficients"]["home_ice"]))
 
     def ll(p, won):

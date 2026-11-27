@@ -37,5 +37,12 @@ CREATE TABLE IF NOT EXISTS predictions.game_predictions (
 
 -- A row is locked once it's been written on or after its game date (the final pre-game
 -- prediction, or a backfill). src/pipeline/predict.py never updates a locked row.
+-- Each side's model inputs, whatever the model (added for the women's model, whose inputs
+-- differ: shots for per game, schedule-adjusted goal diff, PDO). The close_shot_share and
+-- goal_diff_per_game columns above stay for the men's v1.
+ALTER TABLE predictions.game_predictions
+    ADD COLUMN IF NOT EXISTS home_inputs JSONB,
+    ADD COLUMN IF NOT EXISTS away_inputs JSONB;
+
 CREATE INDEX IF NOT EXISTS game_predictions_season_idx
     ON predictions.game_predictions (season, model, game_date);

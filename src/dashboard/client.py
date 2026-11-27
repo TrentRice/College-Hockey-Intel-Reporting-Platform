@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 import requests
@@ -14,12 +16,28 @@ API_URL = os.environ.get("CHIRP_API_URL", "http://127.0.0.1:8000").rstrip("/")
 TIMEOUT = 15
 
 
+# The league every request is for (men's or women's; the API's ?league=). Set per request by
+# the dashboard with `with league("women"): ...`; each Streamlit session runs in its own
+# context, so users on different leagues never mix.
+_league: ContextVar[str] = ContextVar("league", default="men")
+
+
+@contextmanager
+def league(key: str):
+    token = _league.set(key)
+    try:
+        yield
+    finally:
+        _league.reset(token)
+
+
 class ApiError(Exception):
     pass
 
 
 def get(path: str, **params: Any) -> Any:
     params = {k: v for k, v in params.items() if v is not None}
+    params["league"] = _league.get()
     for k, v in params.items():
         if isinstance(v, dt.date):
             params[k] = v.isoformat()

@@ -17,9 +17,11 @@ from zoneinfo import ZoneInfo
 
 import psycopg
 
+from config import leagues
 from src.pipeline.refresh import OPS_SQL
 
-RUNS_FILE = Path("data/pipeline_runs.csv")
+# The league's history file: data/pipeline_runs.csv (men's), data/women/pipeline_runs.csv
+RUNS_FILE = leagues.current().data / "pipeline_runs.csv"
 COLUMNS = [
     "started_at", "finished_at", "status", "trigger", "failed_step",
     "played_before", "played_after", "log_file", "message",

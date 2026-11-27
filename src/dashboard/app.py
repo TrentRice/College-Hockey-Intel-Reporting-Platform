@@ -77,8 +77,35 @@ st.set_page_config(page_title="CHIRP: College Hockey Intelligence & Reporting Pl
 
 
 @st.cache_data(ttl=CACHE_SECONDS, show_spinner=False)
+def _cached(league_key: str, fn_name: str, *args):
+    with client.league(league_key):  # the league is part of the cache key
+        return getattr(client, fn_name)(*args)
+
+
+# ----------------------------------------------------------------------------
+# League: men's or women's (config/leagues.py). Kept in the URL (?league=women) so a link
+# opens the same view.
+# ----------------------------------------------------------------------------
+
+LEAGUE_LABELS = {"men": "Men", "women": "Women"}
+_from_url = st.query_params.get("league", "men")
+with st.sidebar:
+    st.header("🏒 CHIRP Scouting")
+    LEAGUE = st.segmented_control(
+        "League",
+        list(LEAGUE_LABELS),
+        format_func=LEAGUE_LABELS.get,
+        default=_from_url if _from_url in LEAGUE_LABELS else "men",
+        key="league",
+    ) or "men"  # clicking the selected option clears it: stay where we were
+if st.query_params.get("league", "men") != LEAGUE:
+    st.query_params["league"] = LEAGUE
+WOMEN = LEAGUE == "women"
+LEAGUE_WORD = "women's" if WOMEN else "men's"
+
+
 def cached(fn_name: str, *args):
-    return getattr(client, fn_name)(*args)
+    return _cached(LEAGUE, fn_name, *args)
 
 
 def palette() -> dict:
@@ -146,7 +173,6 @@ except client.ApiError as e:
 
 season_names = [s["season"] for s in seasons]
 with st.sidebar:
-    st.header("🏒 CHIRP Scouting")
     season = st.selectbox("Season", season_names, index=len(season_names) - 1)
     teams = cached("teams", season)
     by_name = {t["name"]: t for t in teams}
@@ -215,9 +241,21 @@ with st.sidebar:
 # ----------------------------------------------------------------------------
 
 FACTOR_LABELS = {
+    # men's model
     "close_shot_share": "Close-game shot share",
     "goal_diff_per_game": "Goal differential / game",
+    # women's model
+    "shots_for_per_game": "Shots for / game",
+    "adj_goal_diff_per_game": "Schedule-adjusted goal diff / game",
+    "pdo": "PDO (shooting % + save %)",
     "home_ice": "Home ice",
+}
+FACTOR_FORMATS = {
+    "close_shot_share": "{:.1%}",
+    "goal_diff_per_game": "{:+.2f}",
+    "shots_for_per_game": "{:.1f}",
+    "adj_goal_diff_per_game": "{:+.2f}",
+    "pdo": "{:.3f}",
 }
 
 
@@ -282,18 +320,16 @@ def show_prediction(pred: dict, team: dict, title: str) -> None:
         f"{abs(effects[biggest]):.1f} points {lean} {team_name}."
     )
 
-    def pct(v):
-        return "–" if v is None else f"{v:.1%}"
-
-    def num(v):
-        return "–" if v is None else f"{v:+.2f}"
+    def show(key, v):
+        return "–" if v is None else FACTOR_FORMATS[key].format(v)
 
     where = "neutral site" if not pred["home_ice"] else ("home" if is_home else "away")
+    # the model's own inputs, in its order (men's and women's models use different ones)
     rows = [
-        {"Factor": FACTOR_LABELS["close_shot_share"], team_name: pct(mine["close_shot_share"]),
-         opp_name: pct(theirs["close_shot_share"]), "Effect on chance": effects["close_shot_share"]},
-        {"Factor": FACTOR_LABELS["goal_diff_per_game"], team_name: num(mine["goal_diff_per_game"]),
-         opp_name: num(theirs["goal_diff_per_game"]), "Effect on chance": effects["goal_diff_per_game"]},
+        {"Factor": FACTOR_LABELS[key], team_name: show(key, mine.get(key)),
+         opp_name: show(key, theirs.get(key)), "Effect on chance": effects[key]}
+        for key in pred["factors"] if key != "home_ice"
+    ] + [
         {"Factor": FACTOR_LABELS["home_ice"], team_name: where,
          opp_name: {"home": "away", "away": "home"}.get(where, where), "Effect on chance": effects["home_ice"]},
         {"Factor": "Games played", team_name: str(mine["games_played"]),
@@ -305,18 +341,35 @@ def show_prediction(pred: dict, team: dict, title: str) -> None:
         width="stretch",
         placeholder="",
     )
+    if WOMEN:
+        inputs_note = (
+            "Schedule-adjusted goal differential adds the average goal differential of the "
+            "opponents faced. PDO is shooting % + save %: holding the rest equal, a higher PDO "
+            "slightly *lowers* the chance, because a record built on hot shooting or "
+            "goaltending is partly luck."
+        )
+        model_note = (
+            f"Model {pred['model']}, the women's model, trained on 2025-26. The chance is for "
+            "a game that has a winner: about 6% of games end tied. It's a rough guide until both "
+            "teams have played 6 games. On 2026-27 so far it beats picking the home team, but "
+            "treat it as a probability, not a pick."
+        )
+    else:
+        inputs_note = (
+            "Close-game shot share counts shots in periods that started tied or within one "
+            "goal. Goal differential leaves out empty-net goals."
+        )
+        model_note = (
+            f"Model {pred['model']}, trained on 2025-26. The chance is for a game that has a "
+            "winner: about 7% of college games end tied. On 2026-27 games so far it predicts "
+            "better than picking the home team, but treat it as a probability, not a pick."
+        )
     st.caption(
         f"Each team's season before {pd.Timestamp(pred['as_of']):%b %-d}, D-I games only. "
         "**Effect on chance**: how many points that factor moves "
-        f"{team_name}'s chance, compared with it being even. Close-game shot share counts "
-        "shots in periods that started tied or within one goal. Goal differential leaves "
-        "out empty-net goals."
+        f"{team_name}'s chance, compared with it being even. {inputs_note}"
     )
-    st.caption(
-        f"Model {pred['model']}, trained on 2025-26. The chance is for a game that has a "
-        "winner: about 7% of college games end tied. On 2026-27 games so far it predicts "
-        "better than picking the home team, but treat it as a probability, not a pick."
-    )
+    st.caption(model_note)
 
 
 def render_win_probability() -> None:
@@ -384,9 +437,10 @@ def render_model_record() -> None:
     )
     c1, c2, c3 = st.columns(3)
     only_mine = c1.toggle(f"Only {home_name}'s games", key="rec_mine")
+    warmup = 6 if WOMEN else 3
     past_warmup = c3.toggle(
         "Only games past the warm-up", value=True, key="rec_warmup",
-        help="Both teams had played 3+ games: the games the model was built and tested for. "
+        help=f"Both teams had played {warmup}+ games: the games the model is reliable for. "
         "Off includes the season's first weeks, when predictions carry a 'rough guide' "
         "warning and tend to be overconfident.",
     )
@@ -579,9 +633,13 @@ def render_rankings() -> None:
             f"**{home_name}**: #{mine['rank']} of {len(teams)}, beats an average team "
             f"{mine['beats_average']:.0%}, {mine['record']}, {movement(mine['change'])} since last week."
         )
+    schedule_note = (
+        "**Partly adjusted for strength of schedule** (through the schedule-adjusted goal "
+        "differential)" if WOMEN
+        else "**Not adjusted for strength of schedule** (tested; it didn't help consistently yet)"
+    )
     st.caption(
-        f"Model {data['model']}. **Not adjusted for strength of schedule** (tested; it didn't "
-        "help consistently yet). Teams need "
+        f"Model {data['model']}. {schedule_note}. Teams need "
         f"{data['min_games']} D-I games to be ranked ({data['unranked']} aren't yet). "
         f"\"Last week\" compares with games before {pd.Timestamp(data['compared_to']):%b %-d}. "
         "Teams a few points apart are close to a coin flip."
@@ -595,18 +653,20 @@ def render_acknowledgments() -> None:
     st.markdown(
         "Every game, box score and player in CHIRP comes from "
         "**[College Hockey News](https://www.collegehockeynews.com)**. Thank you to CHN for "
-        "keeping such complete, carefully kept records of D-I men's college hockey, free "
+        "keeping such complete, carefully kept records of D-I men's and women's college "
+        "hockey, free "
         "for fans to read. This project wouldn't exist without them."
     )
     st.markdown(
         """
 **What comes from CHN**
-- Schedules and results for every D-I team.
+- Schedules and results for every D-I men's and women's team.
 - Box scores: goals and shots by period, special teams, skater and goalie lines, every goal
   and penalty.
-- CHN's expected goals (xG), shown in the Team tab's chart. The win model doesn't use them.
+- CHN's expected goals (xG), shown in the Team tab's chart (men's only: CHN doesn't
+  publish xG for women's games). The win models don't use them.
 
-**What's CHIRP's own work:** the stable player and team ids, the form numbers, the win model,
+**What's CHIRP's own work:** the stable player and team ids, the form numbers, the win models,
 its probabilities and rankings, and the prediction log. Any errors in those are mine, not
 CHN's.
 
@@ -631,7 +691,8 @@ College Hockey News**. All CHN data and content remain theirs.
 
 st.markdown(
     "**CHIRP** · College Hockey Intelligence & Reporting Platform",
-    help="Scouting, win probabilities and rankings for D-I men's college hockey.",
+    help=f"Scouting, win probabilities and rankings for D-I men's and women's college hockey "
+    f"(showing {LEAGUE_WORD}).",
 )
 st.title(f"{home_name} vs {scouted['name']}")
 header_caption = st.empty()
@@ -736,69 +797,114 @@ with tab_team:
         scale=alt.Scale(domain=[0.5, games_played + 0.5], nice=False, zero=False),
         axis=alt.Axis(values=list(range(1, games_played + 1)), grid=False, format="d"),
     )
+    # CHN publishes xG for men's games only. Men's: actual vs expected goal differential
+    # (xG), both in goals on one axis. Women's: actual goal differential vs shot share, on a
+    # second axis whose 50% sits on the zero line.
+    has_xg = all_games["xg_diff"].notna().any()
     tooltip = [
         alt.Tooltip("date:T", title="Date", format="%b %-d"),
         alt.Tooltip("opponent_name:N", title="Opponent"),
         alt.Tooltip("where:N", title="Home/away"),
         alt.Tooltip("result_label:N", title="Result"),
         alt.Tooltip("goal_diff:Q", title="Actual goal diff", format="+d"),
-        alt.Tooltip("xg_diff:Q", title="Expected goal diff (xG)", format="+.2f"),
-        alt.Tooltip("xg_for:Q", title="xG for", format=".2f"),
-        alt.Tooltip("xg_against:Q", title="xG against", format=".2f"),
+        *([
+            alt.Tooltip("xg_diff:Q", title="Expected goal diff (xG)", format="+.2f"),
+            alt.Tooltip("xg_for:Q", title="xG for", format=".2f"),
+            alt.Tooltip("xg_against:Q", title="xG against", format=".2f"),
+        ] if has_xg else []),
         alt.Tooltip("shot_share:Q", title="Shot share", format=".1%"),
-        alt.Tooltip("xg_share:Q", title="xG share", format=".1%"),
+        *([alt.Tooltip("xg_share:Q", title="xG share", format=".1%")] if has_xg else []),
         alt.Tooltip("shots_for:Q", title="Shots for"),
         alt.Tooltip("shots_against:Q", title="Shots against"),
     ]
 
-    # Actual vs expected, both in goals so they share one axis: bars = what happened,
-    # line = what the chances said (CHN xG for minus xG against)
-    st.markdown("**Actual vs expected goal differential by game**")
-    won, lost, expected = "Won by", "Lost by", "Expected (xG for − against)"
+    won, lost = "Won by", "Lost by"
+    line_label = "Expected (xG for − against)" if has_xg else "Shot share (right axis)"
     legend_scale = alt.Scale(
-        domain=[won, lost, expected], range=[colors["pos"], colors["neg"], colors["expected"]]
+        domain=[won, lost, line_label], range=[colors["pos"], colors["neg"], colors["expected"]]
     )
+    legend = alt.Legend(title=None, orient="top")
     all_games["outcome"] = [won if d >= 0 else lost for d in all_games["goal_diff"]]
-    all_games["expected_series"] = expected
-    y = alt.Y("goal_diff:Q", title="Goal differential")
+    all_games["line_series"] = line_label
+    if has_xg:
+        st.markdown("**Actual vs expected goal differential by game**")
+        goals_scale = alt.Scale()
+    else:
+        st.markdown("**Goal differential and shot share by game**")
+        # symmetric, so the goal axis's 0 lines up with the shot share axis's 50%
+        reach = max(1, int(all_games["goal_diff"].abs().max()) + 1)
+        goals_scale = alt.Scale(domain=[-reach, reach], nice=False)
     bars = (
         alt.Chart(all_games)
         .mark_bar(size=14, cornerRadiusEnd=4)
         .encode(
             x=x_axis,
-            y=y,
-            color=alt.Color(
-                "outcome:N", scale=legend_scale, legend=alt.Legend(title=None, orient="top")
-            ),
+            y=alt.Y("goal_diff:Q", title="Goal differential", scale=goals_scale,
+                    axis=alt.Axis(grid=True)),  # dual-axis charts drop the grid by default
+            color=alt.Color("outcome:N", scale=legend_scale, legend=legend),
             opacity=alt.condition(alt.datum.in_window, alt.value(1.0), alt.value(0.45)),
             tooltip=tooltip,
         )
     )
-    expected_line = (
-        alt.Chart(all_games.dropna(subset=["xg_diff"]))
-        .mark_line(strokeWidth=2, point=alt.OverlayMarkDef(size=80, filled=True, shape="diamond"))
-        .encode(
-            x=x_axis,
-            y=alt.Y("xg_diff:Q", title="Goal differential"),
-            color=alt.Color(
-                "expected_series:N", scale=legend_scale, legend=alt.Legend(title=None, orient="top")
-            ),
-            tooltip=tooltip,
+    diamonds = alt.OverlayMarkDef(size=80, filled=True, shape="diamond")
+    if has_xg:
+        line = (
+            alt.Chart(all_games.dropna(subset=["xg_diff"]))
+            .mark_line(strokeWidth=2, point=diamonds)
+            .encode(
+                x=x_axis,
+                y=alt.Y("xg_diff:Q", title="Goal differential"),
+                color=alt.Color("line_series:N", scale=legend_scale, legend=legend),
+                tooltip=tooltip,
+            )
         )
+    else:
+        line = (
+            alt.Chart(all_games.dropna(subset=["shot_share"]))
+            .mark_line(strokeWidth=2, point=diamonds)
+            .encode(
+                x=x_axis,
+                y=alt.Y(
+                    "shot_share:Q", title="Shot share",
+                    scale=alt.Scale(domain=[0, 1], nice=False),
+                    axis=alt.Axis(format="%", orient="right", values=[0, 0.25, 0.5, 0.75, 1]),
+                ),
+                color=alt.Color("line_series:N", scale=legend_scale, legend=legend),
+                tooltip=tooltip,
+            )
+        )
+    zero = (
+        alt.Chart(pd.DataFrame({"y": [0]}))
+        .mark_rule(color=colors["ref"])
+        # women's: its own (hidden) axis on the goal scale; men's: the shared axis, as before
+        .encode(y=alt.Y("y:Q", scale=goals_scale, axis=None) if not has_xg else "y:Q")
     )
-    zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color=colors["ref"]).encode(y="y:Q")
-    st.altair_chart(
-        (band + zero + bars + expected_line).resolve_scale(color="shared"), width="stretch"
-    )
-    caption = (
-        "Bars: actual goal differential (blue = won by, red = lost by). Diamonds: expected "
-        "goal differential from CHN's xG. **End of the bar above the diamond = better than "
-        "expected; below = worse.** That holds for losses too: losing by 1 when expected to lose "
-        "by 2 puts the bar's end above the diamond, so they outperformed. Shaded: the selected "
-        "games. Hover for shot share, xG share and shots."
-    )
-    if all_games["xg_diff"].isna().any():
-        caption += " Games without xG have no diamond."
+    chart = alt.layer(band, zero, bars, line)
+    if has_xg:
+        chart = chart.resolve_scale(color="shared")
+    else:  # bars and the zero line share the goal scale by domain; shot share gets its own
+        chart = chart.resolve_scale(color="shared", y="independent")
+    st.altair_chart(chart, width="stretch")
+    if has_xg:
+        caption = (
+            "Bars: actual goal differential (blue = won by, red = lost by). Diamonds: expected "
+            "goal differential from CHN's xG. **End of the bar above the diamond = better than "
+            "expected; below = worse.** That holds for losses too: losing by 1 when expected to "
+            "lose by 2 puts the bar's end above the diamond, so they outperformed. Shaded: the "
+            "selected games. Hover for shot share, xG share and shots."
+        )
+        if all_games["xg_diff"].isna().any():
+            caption += " Games without xG have no diamond."
+    else:
+        caption = (
+            "Bars: actual goal differential (blue = won by, red = lost by; left axis). Diamonds: "
+            "shot share (right axis). **The gray line is both a tied score and 50% of the "
+            "shots**, so a diamond above it means the team outshot its opponent. **A bar and its "
+            "diamond on opposite sides of the line = the result went against the shots**: a win "
+            "while outshot, or a loss while outshooting. Shots are the women's model's strongest "
+            "input (CHN doesn't publish expected goals for women's games). Shaded: the selected "
+            "games. Hover for shots."
+        )
     st.caption(caption)
 
     st.subheader(f"Games: {window_label.lower()}")

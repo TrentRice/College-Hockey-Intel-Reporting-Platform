@@ -1,5 +1,8 @@
 """
-Win model v1: the home team's chance of winning a game, from each team's season so far.
+Win models: the home team's chance of winning a game, from each team's season so far.
+Two frozen models, one per league (config/leagues.py): win_model_v1 (men's, docs/model.md)
+and win_model_women_v1 (women's, docs/model_women.md). MODELS below says which inputs each
+one uses; the card's name picks the right one.
 
   card = load_card()
   pred = predict_game(conn, card, game)   # a scheduled game: a row from `games`
@@ -16,6 +19,9 @@ The model (see docs/eda.md):
         + b_home  * home_ice          (1 = home game, 0 = neutral site)
   P(home win) = 1 / (1 + e^-score)
 
+The women's model uses shots for per game, schedule-adjusted goal differential and PDO
+(docs/model_women.md); notebooks/women/09_model.ipynb checks this module against it.
+
 Rules, the same as training:
   * Season to date, strictly before the game's date (nothing from that day or later).
   * D-I vs D-I games only, as inputs and as games to predict.
@@ -30,31 +36,78 @@ from __future__ import annotations
 import datetime as dt
 import json
 import math
+from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from psycopg.rows import dict_row
 
-CARD_PATH = Path(__file__).resolve().parents[2] / "models" / "win_model_v1.json"
-MIN_GAMES = 3  # the training warm-up
+MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
+CARD_PATH = MODELS_DIR / "win_model_v1.json"
 
-# card feature name -> the per-team input it's the home-minus-away difference of
-INPUTS = {
-    "diff_close_shot_share_season": "close_shot_share",
-    "diff_goal_diff_pg_no_en_season": "goal_diff_per_game",
+
+@dataclass(frozen=True)
+class Spec:
+    """What a frozen model needs from this code."""
+    inputs: dict[str, str]  # card feature -> the per-team input it's the home-minus-away diff of
+    reliable_games: int  # below this many games on either team, predictions are a rough guide
+    rank_min_games: int  # games needed to be ranked
+    complete_box_only: bool  # inputs only from games whose box score matches the score
+    reliability_note: str
+
+
+MODELS = {
+    "win_model_v1": Spec(
+        inputs={
+            "diff_close_shot_share_season": "close_shot_share",
+            "diff_goal_diff_pg_no_en_season": "goal_diff_per_game",
+        },
+        reliable_games=3,  # the training warm-up
+        rank_min_games=5,  # shot share needs about 4-8 games to mean much (EDA step 4)
+        complete_box_only=False,
+        reliability_note="the model was trained on games where both teams had played at least {n}",
+    ),
+    "win_model_women_v1": Spec(
+        inputs={
+            "diff_shots_for_pg_season": "shots_for_per_game",
+            "diff_adj_goal_diff_pg": "adj_goal_diff_per_game",
+            "diff_pdo_season": "pdo",
+        },
+        # trained with a 3-game warm-up, but overconfident until both teams have 6 games
+        # (2026-27 test, notebooks/women/09_model.ipynb)
+        reliable_games=6,
+        rank_min_games=6,
+        complete_box_only=True,
+        reliability_note="the model is overconfident until both teams have played {n}",
+    ),
 }
+# The men's model, as before (kept for callers that predate the women's model)
+INPUTS = MODELS["win_model_v1"].inputs
+MIN_GAMES = MODELS["win_model_v1"].reliable_games
 
 
 class ModelUnavailable(Exception):
     pass
 
 
+def card_path(league) -> Path:
+    """The league's frozen card (config/leagues.py)."""
+    return MODELS_DIR / f"{league.model}.json"
+
+
+def spec(card: dict[str, Any]) -> Spec:
+    return MODELS[card["name"]]
+
+
 def load_card(path: Path = CARD_PATH) -> dict[str, Any]:
     if not path.exists():
-        raise ModelUnavailable(f"No model card at {path}. Run notebooks/09_model.ipynb.")
+        raise ModelUnavailable(f"No model card at {path}. Run that league's notebook 09.")
     card = json.loads(path.read_text())
-    missing = set(INPUTS) - set(card["features"])
-    if missing or set(card["features"]) - set(INPUTS):
+    if card.get("name") not in MODELS:
+        raise ModelUnavailable(f"Unknown model {card.get('name')!r}: no inputs defined for it.")
+    expected = set(MODELS[card["name"]].inputs)
+    if set(card["features"]) != expected:
         raise ModelUnavailable(f"Card features {card['features']} don't match this code.")
     return card
 
@@ -121,12 +174,91 @@ def team_inputs(conn, team_id: int, season: str, before: dt.date) -> dict[str, A
     }
 
 
+# ----------------------------------------------------------------------------
+# Women's inputs (win_model_women_v1): built from the whole season's games, because the
+# schedule-adjusted goal differential needs each opponent's record as of each game date
+# ----------------------------------------------------------------------------
+
+# Every D-I vs D-I team-game of the season before the date, complete box scores only (the
+# box score and its goal list both match the official score), as in notebooks/women/01.
+SEASON_GAMES_SQL = """
+SELECT t.team_id, t.opponent_team_id, t.game_date, t.result,
+       t.goals_for, t.goals_against, t.en_goals, t.shots_for, t.shots_against
+FROM features.team_games t
+JOIN hockey.games g USING (game_id)
+JOIN hockey.team_seasons me  ON me.team_id  = t.team_id          AND me.season  = t.season
+JOIN hockey.team_seasons opp ON opp.team_id = t.opponent_team_id AND opp.season = t.season
+WHERE t.season = %(season)s AND t.game_date < %(before)s
+  AND me.is_d1 AND opp.is_d1
+  AND g.home_goals + g.away_goals = t.goals_for + t.goals_against
+  AND (SELECT count(*) FROM hockey.goals go WHERE go.game_id = t.game_id)
+      = t.goals_for + t.goals_against
+"""
+
+
+def season_games(conn, season: str, before: dt.date) -> dict[int, list[dict[str, Any]]]:
+    """Each team's qualifying games before `before`, oldest first."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        rows = cur.execute(SEASON_GAMES_SQL, {"season": season, "before": before}).fetchall()
+    by_team: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for r in sorted(rows, key=lambda r: r["game_date"]):
+        by_team[r["team_id"]].append(r)
+    return by_team
+
+
+def _goal_diff_per_game(games: list[dict[str, Any]]) -> float | None:
+    return sum(g["goals_for"] - g["goals_against"] for g in games) / len(games) if games else None
+
+
+def women_inputs(by_team: dict[int, list[dict[str, Any]]], team_id: int) -> dict[str, Any]:
+    """win_model_women_v1's inputs for one team, from season_games().
+
+    - shots for per game
+    - schedule-adjusted goal differential: goal differential per game (empty-net goals
+      included) + the average, over the team's games, of each opponent's goal differential
+      per game from its games on dates before that game (0 for an opponent with none yet)
+    - PDO: shooting % without empty-net goals + save %
+    """
+    games = by_team.get(team_id, [])
+    n = len(games)
+    sf = sum(g["shots_for"] for g in games)
+    sa = sum(g["shots_against"] for g in games)
+    gf = sum(g["goals_for"] for g in games)
+    ga = sum(g["goals_against"] for g in games)
+    en = sum(g["en_goals"] for g in games)
+    sos_terms = []
+    for g in games:
+        earlier = [o for o in by_team.get(g["opponent_team_id"], []) if o["game_date"] < g["game_date"]]
+        sos_terms.append(_goal_diff_per_game(earlier) or 0.0)
+    gd = (gf - ga) / n if n else None
+    return {
+        "games_played": n,
+        "shots_for_per_game": sf / n if n else None,
+        "adj_goal_diff_per_game": gd + sum(sos_terms) / n if n else None,
+        "pdo": (gf - en) / sf + 1 - ga / sa if sf and sa else None,
+        "goal_diff_per_game": gd,  # for display: the raw figure, not a model input here
+        "wins": sum(g["result"] == "W" for g in games),
+        "losses": sum(g["result"] == "L" for g in games),
+        "ties": sum(g["result"] == "T" for g in games),
+    }
+
+
+def inputs_for(
+    conn, card: dict[str, Any], team_ids: list[int], season: str, before: dt.date
+) -> dict[int, dict[str, Any]]:
+    """Model inputs for several teams at once, for the card's model."""
+    if card["name"] == "win_model_women_v1":
+        by_team = season_games(conn, season, before)
+        return {t: women_inputs(by_team, t) for t in team_ids}
+    return {t: team_inputs(conn, t, season, before) for t in team_ids}
+
+
 def home_win_probability(
     card: dict[str, Any], home: dict[str, Any], away: dict[str, Any], home_ice: bool
 ) -> float:
     """The card's logistic model. A missing input on either side counts as no difference."""
     score = card["coefficients"]["home_ice"] * (1 if home_ice else 0)
-    for feature, key in INPUTS.items():
+    for feature, key in spec(card).inputs.items():
         h, a = home.get(key), away.get(key)
         diff = 0.0 if h is None or a is None else h - a
         score += card["coefficients"][feature] * diff / card["feature_scales"][feature]
@@ -139,21 +271,23 @@ def predict_matchup(
 ) -> dict[str, Any]:
     """Prediction for any two teams, scheduled or not: each team's season before `before`,
     with `home_team_id` as the home side (no home edge when `neutral`)."""
-    home = team_inputs(conn, home_team_id, season, before)
-    away = team_inputs(conn, away_team_id, season, before)
+    both = inputs_for(conn, card, [home_team_id, away_team_id], season, before)
+    home, away = both[home_team_id], both[away_team_id]
     home_ice = not neutral
+    s = spec(card)
     p = home_win_probability(card, home, away, home_ice)
     # How far each factor moves the home team's chance: the probability minus what it would
     # be if that one factor were even (no difference, or a neutral site for home ice).
     factors = {"home_ice": p - home_win_probability(card, home, away, False)}
-    for key in INPUTS.values():
+    for key in s.inputs.values():
         factors[key] = p - home_win_probability(card, home, {**away, key: home.get(key)}, home_ice)
     fewest = min(home["games_played"], away["games_played"])
     note = None
-    if fewest < MIN_GAMES:
+    if fewest < s.reliable_games:
+        reason = s.reliability_note.format(n=s.reliable_games)
         note = (
-            f"A team has played only {fewest} game(s) before this date; the model was trained "
-            f"on games where both teams had played at least {MIN_GAMES}. Treat it as a rough guide."
+            f"A team has played only {fewest} game(s) before this date; {reason}. "
+            "Treat it as a rough guide."
         )
     return {
         "model": card["name"],
@@ -164,7 +298,7 @@ def predict_matchup(
         "factors": factors,
         "home_inputs": home,
         "away_inputs": away,
-        "reliable": fewest >= MIN_GAMES,
+        "reliable": fewest >= s.reliable_games,
         "note": note,
     }
 
@@ -188,7 +322,7 @@ def predict_game(conn, card: dict[str, Any], game: dict[str, Any]) -> dict[str, 
 # head-to-head prediction. "Beats an average team" is the neutral-site chance against the
 # average rating of the ranked teams.
 
-RANK_MIN_GAMES = 5  # shot share needs about 4-8 games to mean much (EDA step 4)
+RANK_MIN_GAMES = MODELS["win_model_v1"].rank_min_games  # the men's; each Spec has its own
 
 D1_TEAMS_SQL = """
 SELECT DISTINCT t.team_id, t.name
@@ -203,7 +337,7 @@ ORDER BY t.team_id
 def team_rating(card: dict[str, Any], inputs: dict[str, Any]) -> float | None:
     """A team's neutral-site strength. None if an input is missing."""
     total = 0.0
-    for feature, key in INPUTS.items():
+    for feature, key in spec(card).inputs.items():
         if inputs.get(key) is None:
             return None
         total += card["coefficients"][feature] * inputs[key] / card["feature_scales"][feature]
@@ -211,14 +345,18 @@ def team_rating(card: dict[str, Any], inputs: dict[str, Any]) -> float | None:
 
 
 def rank_teams(
-    conn, card: dict[str, Any], season: str, before: dt.date, min_games: int = RANK_MIN_GAMES
+    conn, card: dict[str, Any], season: str, before: dt.date, min_games: int | None = None
 ) -> dict[str, Any]:
-    """Every D-I team with at least `min_games` games before `before`, best first."""
+    """Every D-I team with at least `min_games` games before `before` (default: the model's
+    own minimum), best first."""
+    if min_games is None:
+        min_games = spec(card).rank_min_games
     with conn.cursor(row_factory=dict_row) as cur:
         teams = cur.execute(D1_TEAMS_SQL, {"season": season}).fetchall()
+    all_inputs = inputs_for(conn, card, [t["team_id"] for t in teams], season, before)
     rows, unranked = [], 0
     for t in teams:
-        inputs = team_inputs(conn, t["team_id"], season, before)
+        inputs = all_inputs[t["team_id"]]
         rating = team_rating(card, inputs)
         if inputs["games_played"] < min_games or rating is None:
             unranked += 1

@@ -1,8 +1,12 @@
 """
 The nightly refresh in GitHub Actions (the private data repo's workflow, docs/cloud.md).
 
-  python -m src.cloud.nightly            # run if due (same rules as the Mac's scheduler)
-  python -m src.cloud.nightly --force    # run now
+  python -m src.cloud.nightly                          # men's, if due (the Mac scheduler's rules)
+  CHIRP_LEAGUE=women python -m src.cloud.nightly       # women's
+  python -m src.cloud.nightly --force                  # run now
+
+Each league is its own run, with its own files (config/leagues.py: data/ and data/women/),
+database, history and logs; the workflow runs the men's, then the women's.
 
 The job's database is new and empty each time, so before the refresh this loads what the
 data repo remembers (the run history and the newest prediction-log backup), and afterwards
@@ -24,13 +28,15 @@ from pathlib import Path
 
 import psycopg
 
+from config import leagues
 from config.settings import settings
 from src.cloud.runs import RUNS_FILE, export_runs, import_runs, runs_today
 from src.pipeline.backup import BACKUP_DIR, backups, restore_predictions
 from src.pipeline.refresh import KEEP_LOGS, LOG_DIR, refresh
 from src.pipeline.scheduler import should_run
 
-DATA_LOG_DIR = Path("data/logs/refresh")
+# Where the run's log is kept in the data repo: logs/refresh/ (men's), women/logs/refresh/
+DATA_LOG_DIR = leagues.current().data / "logs" / "refresh"
 
 
 def copy_logs(src: Path = LOG_DIR, dst: Path = DATA_LOG_DIR, keep: int = KEEP_LOGS) -> None:

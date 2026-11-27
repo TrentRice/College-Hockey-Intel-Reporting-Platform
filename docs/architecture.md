@@ -49,6 +49,14 @@ private data repo (GitHub)                        Streamlit Community Cloud app
 
 ## Decisions worth knowing
 
+- **Two leagues, one codebase.** Men's and women's share every step: scrapers, validation,
+  loader, API, dashboard and nightly job. Everything that differs lives in
+  [config/leagues.py](../config/leagues.py): CHN's URL prefix and team links, the data
+  folder, the database, the model card, and whether xG and skater ice time exist. Each league
+  has its own frozen model, built from scratch by its own EDA (men's
+  [eda.md](eda.md), women's [eda_women.md](eda_women.md)).
+- **D-I status is per season** (`team_seasons.is_d1`): programs move up (four women's ones
+  did in 2026-27), and a past season's games must use that season's status.
 - **Postgres, one database with separate schemas.** It's in Docker on the Mac; in the cloud,
   each nightly job and each app start gets a fresh one, filled from the private data repo:
   - **`hockey`:** the data, rebuilt in full by every load, in one transaction.

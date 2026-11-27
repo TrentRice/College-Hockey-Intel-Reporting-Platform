@@ -1,7 +1,16 @@
 # Scouting dashboard
 
 An interactive Streamlit app for scouting an opponent over their **last N games**, next to
-their **season so far**. Code: [src/dashboard/](../src/dashboard/).
+their **season so far**, men's or women's. Code: [src/dashboard/](../src/dashboard/).
+
+**Men | Women** at the top of the sidebar switches the whole dashboard: data, teams and the
+win model. The choice is kept in the link (`?league=women`). What differs on the women's side:
+- **Team tab:** the goal differential chart pairs each game with its **shot share** (right
+  axis, 50% on the zero line), because CHN doesn't publish expected goals for women's games.
+- **Win probability:** the women's model's inputs (shots for per game, schedule-adjusted goal
+  differential, PDO), and a "rough guide" warning until both teams have played 6 games
+  (men's: 3).
+- **Rankings:** teams need 6 games to be ranked (men's: 5).
 
 ## Opening it
 
