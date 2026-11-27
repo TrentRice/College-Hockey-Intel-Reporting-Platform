@@ -32,6 +32,8 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    outputs:
+      saved: ${{ steps.save.outputs.saved }}
     services:
       postgres:
         image: postgres:17
@@ -97,6 +99,7 @@ jobs:
       # otherwise only its run history and logs, so data that failed validation never reaches
       # the app. Men's files are this repo's root (except women/), women's are women/.
       - name: Save to this repo
+        id: save
         if: always()
         working-directory: data
         run: |
@@ -117,6 +120,7 @@ jobs:
           if git diff --cached --quiet; then echo "Nothing new to save."; exit 0; fi
           git commit -q -m "Nightly refresh $(date +%F) (men's ${{ steps.men.outcome }}, women's ${{ steps.women.outcome }})"
           git push -q
+          echo "saved=true" >> "$GITHUB_OUTPUT"
 
       - name: Mark the run failed if a refresh failed
         if: steps.men.outcome != 'success' || steps.women.outcome != 'success'
@@ -124,3 +128,28 @@ jobs:
           echo "Men's: ${{ steps.men.outcome }}. Women's: ${{ steps.women.outcome }}."
           echo "See that Refresh step above, and logs/refresh/ (men's) or women/logs/refresh/ in this repo."
           exit 1
+
+  # 5 minutes after new data is saved, visit the site: it picks the data up right away and
+  # counts as a visitor, so the free app doesn't fall asleep (keep-awake.yml does the rest)
+  wake:
+    needs: refresh
+    if: always() && needs.refresh.outputs.saved == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Wait for the app to see the new data
+        run: sleep 300
+
+      - uses: actions/checkout@v4
+        with:
+          repository: TrentRice/College-Hockey-Intel-Reporting-Platform
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install a browser
+        run: uv run --no-project --with playwright python -m playwright install --with-deps chromium
+
+      - name: Visit the site
+        run: uv run --no-project --with playwright python deploy/keep_awake.py

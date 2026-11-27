@@ -1,0 +1,33 @@
+# Keeps the public site awake: Streamlit Community Cloud puts a free app to sleep after 12
+# hours without a visitor. This visits it in a real browser twice a day; the nightly refresh
+# visits once more, 5 minutes after saving new data (refresh.yml). Together the gaps stay
+# under about 9 hours. The visit script is deploy/keep_awake.py in the code repo.
+#
+# Lives in this private repo, not the public code repo: GitHub turns off scheduled workflows
+# in public repos after 60 days without commits; this repo gets a commit every night.
+name: Keep the site awake
+
+on:
+  schedule:  # UTC; GitHub often runs scheduled jobs a few minutes late
+    - cron: "40 17 * * *"   # 12:40 p.m. EST / 1:40 p.m. EDT
+    - cron: "40 1 * * *"    # 8:40 p.m. EST / 9:40 p.m. EDT
+  workflow_dispatch:
+
+jobs:
+  visit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: TrentRice/College-Hockey-Intel-Reporting-Platform
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install a browser
+        run: uv run --no-project --with playwright python -m playwright install --with-deps chromium
+
+      - name: Visit the site
+        run: uv run --no-project --with playwright python deploy/keep_awake.py

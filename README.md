@@ -74,8 +74,8 @@ history, prediction log and model.
     the prediction log.
 - **Public app:** Streamlit Community Cloud. It pulls both leagues from the private repo
   with a read-only token and runs the database and API privately inside the app. Only the
-  dashboard page is public. An idle app naps after 12 hours, and the next visitor wakes it
-  in about a minute.
+  dashboard page is public. Free apps sleep after 12 hours without a visitor, so a scheduled
+  browser visit keeps it awake: 5 minutes after each nightly refresh, and twice more a day.
 
 Details: [architecture](docs/architecture.md) · [database](docs/schema.md) ·
 [pipeline](docs/pipeline.md) · [API](docs/api.md) · [dashboard](docs/dashboard.md) ·

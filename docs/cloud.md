@@ -151,8 +151,14 @@ instead of GitHub.
 
 ## Limits of the free tier
 
-- **Naps:** an app with no visitors for 12 hours goes to sleep. The next visitor clicks a
-  button to wake it, which takes about a minute.
+- **Naps, and how CHIRP avoids them:** an app with no visitors for 12 hours goes to sleep, and
+  the next visitor clicks a button to wake it (about a minute). So CHIRP visits itself in a
+  real browser ([deploy/keep_awake.py](../deploy/keep_awake.py)): 5 minutes after the nightly
+  refresh saves new data (which also loads that data straight away), and at about 12:40 p.m.
+  and 8:40 p.m. Eastern (`keep-awake.yml` in the data repo). The longest gap is about 9 hours.
+  If a visit finds the app asleep, it clicks the wake-up button. These visits run in the
+  private data repo because GitHub turns off scheduled workflows in public repos after 60 days
+  without commits.
 - **Resources:** about 0.7–2.7 GB of memory. CHIRP uses a few hundred MB.
 - **Usage statistics:** Streamlit Cloud always turns on Streamlit's anonymous usage statistics,
   whatever `.streamlit/config.toml` says. Locally they stay off.
