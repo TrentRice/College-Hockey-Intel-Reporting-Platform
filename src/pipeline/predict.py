@@ -41,8 +41,8 @@ CANDIDATES_SQL = """
 SELECT g.game_id, g.season, g.game_date, g.home_team_id, g.away_team_id, g.is_neutral,
        g.is_played
 FROM hockey.games g
-JOIN hockey.teams h ON h.team_id = g.home_team_id
-JOIN hockey.teams a ON a.team_id = g.away_team_id
+JOIN hockey.team_seasons h ON h.team_id = g.home_team_id AND h.season = g.season
+JOIN hockey.team_seasons a ON a.team_id = g.away_team_id AND a.season = g.season
 WHERE h.is_d1 AND a.is_d1 AND (
     -- upcoming in the window
     (NOT g.is_played AND g.game_date BETWEEN %(today)s AND %(until)s)

@@ -7,6 +7,8 @@ place.
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from config import leagues
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -21,3 +23,9 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Each league has its own database on the same server (config/leagues.py). The men's URL is
+# used exactly as configured; for women's, only the database name changes.
+_league = leagues.current()
+if _league is not leagues.MEN:
+    settings.database_url = leagues.database_url(settings.database_url, _league)

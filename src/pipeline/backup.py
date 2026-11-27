@@ -28,11 +28,12 @@ from zoneinfo import ZoneInfo
 
 import psycopg
 
+from config import leagues
 from config.settings import settings
 from src.db.load import refresh_guard
 
 ROOT = Path(__file__).resolve().parents[2]
-BACKUP_DIR = ROOT / "data" / "backups"
+BACKUP_DIR = ROOT / leagues.current().data / "backups"  # CHIRP_LEAGUE (config/leagues.py)
 PREDICTIONS_SQL = ROOT / "db" / "predictions.sql"
 TABLE = "predictions.game_predictions"
 KEEP = 30

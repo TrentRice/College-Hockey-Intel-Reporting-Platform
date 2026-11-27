@@ -37,7 +37,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 
 from src.ingestion.chn_boxscore_downloader import box_path, load_played_games
-from src.ingestion.chn_team_schedule_scraper import Season, clean
+from src.ingestion.chn_team_schedule_scraper import LEAGUE, Season, clean
 
 SIDES = ("away", "home")  # CHN lists the visitor first; vscore/hscore rows mark the side
 
@@ -123,7 +123,7 @@ def parse_meta(soup) -> tuple[dict, dict, dict]:
     for side, div in zip(SIDES, soup.select("#meta > div.team")):
         a = div.find("h4").find("a")
         names[side] = clean(a.get_text())
-        m = re.search(r"/reports/team/[^/]+/(\d+)", a.get("href") or "")
+        m = LEAGUE.team_link.search(a.get("href") or "")
         ids[side] = int(m.group(1)) if m else None
         scores[side] = to_int(div.find("h2").get_text())
 
@@ -555,7 +555,7 @@ def parse_season(season: Season, root: Path = Path(".")) -> dict[str, pd.DataFra
             tables["penalties"].append({**base, **team_cols(x["side"]), **without_side(x)})
 
     out = {k: pd.DataFrame(v) for k, v in tables.items()}
-    out_dir = root / "data/processed/chn"
+    out_dir = root / LEAGUE.processed("chn")
     out_dir.mkdir(parents=True, exist_ok=True)
     for k, df in out.items():
         for col in df.columns:

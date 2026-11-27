@@ -29,9 +29,13 @@ from pathlib import Path
 
 import psycopg
 
+from config import leagues
 from config.settings import settings
+from src.db.load import ensure_database
 
-LOG_DIR = Path("logs/refresh")
+LEAGUE = leagues.current()  # CHIRP_LEAGUE (config/leagues.py); steps inherit it
+LOG_DIR = Path("logs/refresh") if LEAGUE is leagues.MEN else Path(f"logs/{LEAGUE.key}/refresh")
+MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
 KEEP_LOGS = 60
 LOCK_ID = 7_310_001  # arbitrary, unique to this pipeline
 IN_PIPELINE_ENV = "CHIRP_IN_PIPELINE"  # set for the steps, so `src.db.load` knows the lock is ours
@@ -63,7 +67,7 @@ class Step:
 
 def default_steps(report_path: Path) -> list[Step]:
     py = [sys.executable, "-m"]
-    return [
+    steps = [
         Step("schedules", [*py, "src.ingestion.chn_team_schedule_scraper", "--strict"]),
         # not --strict: one missing box score shouldn't stop the rest; validation catches it
         Step("boxscores", [*py, "src.ingestion.chn_boxscore_downloader"]),
@@ -75,11 +79,17 @@ def default_steps(report_path: Path) -> list[Step]:
         ),
         Step("ids", [*py, "src.transform.id_mapping"]),
         Step("load", [*py, "src.db.load"]),
-        # after the load: log win probabilities for the coming week (db/predictions.sql)
-        Step("predict", [*py, "src.pipeline.predict"]),
-        # the prediction log can't be rebuilt from CHN: keep a copy in data/backups/
-        Step("backup", [*py, "src.pipeline.backup"]),
     ]
+    # Predictions and their backup need the league's frozen win model. A league without one
+    # yet (women's, until its EDA is done) refreshes the data only.
+    if (MODELS_DIR / f"{LEAGUE.model}.json").exists():
+        steps += [
+            # after the load: log win probabilities for the coming week (db/predictions.sql)
+            Step("predict", [*py, "src.pipeline.predict"]),
+            # the prediction log can't be rebuilt from CHN: keep a copy in data/backups/
+            Step("backup", [*py, "src.pipeline.backup"]),
+        ]
+    return steps
 
 
 @dataclass
@@ -160,6 +170,7 @@ def refresh(
     report_path = log_path.with_suffix(".validation.md")
     steps = steps or default_steps(report_path)
 
+    ensure_database(url)  # each league has its own database; the women's starts empty
     # the lock connection stays open for the whole run; Postgres frees the lock if we die
     with psycopg.connect(url, autocommit=True) as lock_conn:
         lock_conn.execute(OPS_SQL)

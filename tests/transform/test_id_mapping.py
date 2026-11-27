@@ -47,6 +47,18 @@ GAMES = games(
 )
 
 
+def test_a_program_moving_up_to_d1_keeps_one_id():
+    """Non-D-I in 2025-26 (no CHN link, matched by name), D-I with a CHN id in 2026-27."""
+    t = build_teams(games(
+        ("2025-26", "Franklin Pierce", None, None, "Boston University", 10, "Hockey East"),
+        ("2026-27", "Franklin Pierce", 406, "NEWHA", "Boston University", 10, "Hockey East"),
+    ))
+    fpu = t.teams[t.teams.name == "Franklin Pierce"]
+    assert len(fpu) == 1 and fpu.chn_team_id.iloc[0] == 406 and fpu.is_d1.iloc[0]
+    assert t.aliases.alias.is_unique
+    assert len(t.seasons[t.seasons.team_id == fpu.team_id.iloc[0]]) == 2
+
+
 def test_teams_one_id_per_chn_team_with_aliases():
     t = build_teams(GAMES)
     assert len(t.teams) == 3  # RPI, BU, Maryville; TBD is not a team

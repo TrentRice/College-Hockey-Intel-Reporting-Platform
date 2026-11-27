@@ -70,8 +70,8 @@ SELECT t.result, t.goals_for, t.goals_against, t.en_goals,
 FROM features.team_games t
 JOIN hockey.team_game_stats s ON s.game_id = t.game_id AND s.team_id = t.team_id
 JOIN hockey.team_game_stats o ON o.game_id = t.game_id AND o.team_id = t.opponent_team_id
-JOIN hockey.teams me  ON me.team_id  = t.team_id
-JOIN hockey.teams opp ON opp.team_id = t.opponent_team_id
+JOIN hockey.team_seasons me  ON me.team_id  = t.team_id          AND me.season  = t.season
+JOIN hockey.team_seasons opp ON opp.team_id = t.opponent_team_id AND opp.season = t.season
 LEFT JOIN LATERAL (
     SELECT COUNT(*) FILTER (WHERE go.team_id = t.team_id AND go.period <= 1) AS my1,
            COUNT(*) FILTER (WHERE go.team_id = t.team_id AND go.period <= 2) AS my2,
@@ -193,8 +193,9 @@ RANK_MIN_GAMES = 5  # shot share needs about 4-8 games to mean much (EDA step 4)
 D1_TEAMS_SQL = """
 SELECT DISTINCT t.team_id, t.name
 FROM hockey.teams t
+JOIN hockey.team_seasons ts ON ts.team_id = t.team_id AND ts.season = %(season)s
 JOIN features.team_games tg ON tg.team_id = t.team_id
-WHERE t.is_d1 AND tg.season = %(season)s
+WHERE ts.is_d1 AND tg.season = %(season)s
 ORDER BY t.team_id
 """
 

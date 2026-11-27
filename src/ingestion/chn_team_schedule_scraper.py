@@ -41,14 +41,17 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
+from config import leagues
 from src.ingestion.http import HEADERS, check_robots  # noqa: F401  (HEADERS re-exported)
 
 BASE_URL = "https://www.collegehockeynews.com"
+LEAGUE = leagues.current()  # CHIRP_LEAGUE: men's or women's pages (config/leagues.py)
 
 # Any team's page works for discovering the menu; BU is always present.
 DISCOVERY_TEAM = ("Boston-University", 10)
 
-# Fallback team list (2025-26) used only if the menu can't be read.
+# Fallback men's team list (2025-26) used only if the menu can't be read. Women's has none:
+# a run without the menu stops instead.
 # conference -> [(display name, chn slug, chn team id)]
 _FALLBACK_CONFERENCES: dict[str, list[tuple[str, str, int]]] = {
     "Atlantic Hockey": [
@@ -276,7 +279,7 @@ def to_int(text: str) -> int | None:
 
 
 def schedule_url(slug: str, team_id: int, season: Season) -> str:
-    return f"{BASE_URL}/schedules/team/{slug}/{team_id}/{season.code}"
+    return f"{BASE_URL}{LEAGUE.url_prefix}/schedules/team/{slug}/{team_id}/{season.code}"
 
 
 def parse_team_menu(html: str) -> TeamRegistry | None:
@@ -305,15 +308,19 @@ def load_registry(
     try:
         html = fetch_html(
             schedule_url(slug, tid, season),
-            root / f"data/raw/chn/schedules/{slug}_{season.code}.html",
+            root / LEAGUE.raw("schedules", f"{slug}_{season.code}.html"),
             refresh,
             max_age_hours,
         )
         reg = parse_team_menu(html)
     except Exception as e:
+        if LEAGUE is not leagues.MEN:
+            raise SystemExit(f"Couldn't read the {LEAGUE.key}'s team menu ({e}).") from e
         print(f"WARNING: couldn't read the team menu ({e}); using the built-in 2025-26 list")
         return fallback_registry()
     if reg is None:
+        if LEAGUE is not leagues.MEN:
+            raise SystemExit(f"The {LEAGUE.key}'s team menu wasn't found on the page.")
         print("WARNING: team menu not found on the page; using the built-in 2025-26 list")
         return fallback_registry()
     return reg
@@ -371,14 +378,14 @@ def fetch_html(
 
 def parse_opponent_cell(td) -> dict:
     """Opponent link + trailing markers like (nc) / (ex)."""
-    link = td.find("a", href=re.compile(r"/reports/team/"))
+    link = td.find("a", href=LEAGUE.team_link)
     text = clean(td.get_text(" "))
     name = clean(link.get_text()) if link else re.sub(r"\(.*?\)", "", text).strip()
     markers = {m.lower() for m in re.findall(r"\(([^)]*)\)", text)}
     href = urljoin(BASE_URL, link["href"]) if link else None
     team_id = None
     if href:
-        m = re.search(r"/reports/team/[^/]+/(\d+)", href)
+        m = LEAGUE.team_link.search(href)
         team_id = int(m.group(1)) if m else None
     return {
         "opponent": name,
@@ -437,7 +444,7 @@ def parse_schedule_html(html: str, team: str, source_url: str, season: Season) -
 
         # Opponent cell: the team link if there is one; otherwise (exhibitions/non-D-I have no
         # link) the cell 5 after the result cell, or the cell carrying an (nc)/(ex) marker.
-        opp_td = next((t for t in tds if t.find("a", href=re.compile(r"/reports/team/"))), None)
+        opp_td = next((t for t in tds if t.find("a", href=LEAGUE.team_link)), None)
         if opp_td is None and idx is not None and len(tds) > idx + 5:
             opp_td = tds[idx + 5]
         if opp_td is None:
@@ -527,7 +534,7 @@ def scrape_team(
     slug, team_id = reg.teams[team]
     url = schedule_url(slug, team_id, season)
     html = fetch_html(
-        url, root / f"data/raw/chn/schedules/{slug}_{season.code}.html", refresh, max_age_hours
+        url, root / LEAGUE.raw("schedules", f"{slug}_{season.code}.html"), refresh, max_age_hours
     )
     df = parse_schedule_html(html, team, url, season)
 
@@ -547,12 +554,14 @@ def scrape_team(
 # ----------------------------------------------------------------------------
 
 
+BOX_SLOTS = re.compile(r"/box/final/\d{8}/([^/]+)/([^/]+)")
+
+
 def _box_slots(url) -> tuple[str, str] | None:
-    """CHN box URLs end in /<away abbr>/<home abbr>/, e.g. /box/final/20251025/bu_/con/."""
-    if not isinstance(url, str):
-        return None
-    parts = url.rstrip("/").split("/")
-    return (parts[-2], parts[-1]) if len(parts) >= 2 else None
+    """(away abbr, home abbr) from a CHN box URL: /box/final/20251025/bu_/con/ (men's), or
+    /box/final/20261107/mne/bu_/w (women's, with a trailing league marker)."""
+    m = BOX_SLOTS.search(url) if isinstance(url, str) else None
+    return (m.group(1), m.group(2)) if m else None
 
 
 def _differs(a, b) -> bool:
@@ -738,7 +747,7 @@ def scrape_many(
         if len(team_games)
         else pd.DataFrame(columns=GAME_COLUMNS)
     )
-    out = root / f"data/processed/chn/all_games_{season.tag}.csv"
+    out = root / LEAGUE.processed("chn", f"all_games_{season.tag}.csv")
     out.parent.mkdir(parents=True, exist_ok=True)
     games.to_csv(out, index=False)
     print(f"\nCombined: {len(games)} games from {len(frames)} teams -> {out}")

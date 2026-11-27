@@ -35,7 +35,7 @@ erDiagram
 | `conferences` | one per conference, keyed by name | `all_games` |
 | `teams` | one per team; D1 teams carry `chn_team_id` | `ids/teams.csv` |
 | `team_aliases` | every name a team appears under ("Rensselaer", "RPI") | `ids/team_aliases.csv` |
-| `team_seasons` | team × season, with that season's conference | `ids/team_seasons.csv` |
+| `team_seasons` | team × season, with that season's conference and `is_d1` (computed: D-I that season). Programs can move up, so filter a season's games with this, not `teams.is_d1` | `ids/team_seasons.csv` |
 | `players` | one per real player | `ids/players.csv` |
 | `player_seasons` | player × season × team (the roster), with that season's spelling | `ids/player_seasons.csv` |
 | `player_names` | every spelling of a player per season and team (CHN writes some names two ways, e.g. "Jake" / "Jacob Leblanc") | `ids/player_names.csv` |

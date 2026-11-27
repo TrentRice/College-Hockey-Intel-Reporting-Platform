@@ -1,5 +1,10 @@
 .PHONY: cloud-requirements data-repo data-pull setup lint format test up api-up down logs refresh predict backup restore-predictions runs dashboard serve clean validate ids db-up db-down db-reset load psql
 
+# Which league the pipeline commands work on: men (default) or women (config/leagues.py).
+# For example: make validate LEAGUE=women
+LEAGUE ?= men
+export CHIRP_LEAGUE := $(LEAGUE)
+
 # First-time setup: install every dependency group
 setup:
 	uv sync

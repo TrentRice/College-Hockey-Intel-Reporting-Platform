@@ -59,10 +59,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from config import leagues
+
 log = logging.getLogger(__name__)
 
-DATA_DIR = Path("data/processed/chn")
-OUT_DIR = Path("data/processed/ids")
+LEAGUE = leagues.current()  # CHIRP_LEAGUE (config/leagues.py)
+DATA_DIR = LEAGUE.processed("chn")
+OUT_DIR = LEAGUE.processed("ids")
 UNKNOWN_SCORER = "Uknown"  # CHN's own spelling for a goal with no credited scorer
 NOT_PLAYERS = {UNKNOWN_SCORER, "BENCH"}  # BENCH = bench minor, charged to the team
 NOT_TEAMS = {"TBD"}
@@ -124,8 +127,16 @@ def build_teams(games: pd.DataFrame, previous: Teams | None = None) -> Teams:
     clash = seen.groupby("name").chn_team_id.nunique()
     if (clash > 1).any():
         raise ValueError(f"team names used by two CHN ids: {list(clash[clash > 1].index)}")
+    # A program that moves up to D-I is linked by name in its earlier seasons (non-D-I
+    # opponents have no CHN team link) and by CHN id after. It's one team: give the
+    # name-only rows the id it has elsewhere (women's Franklin Pierce, D-I from 2026-27).
+    chn_by_name = {
+        name_key(n): c for n, c in zip(seen.name, seen.chn_team_id) if pd.notna(c)
+    }
     seen["natural_key"] = [
-        f"chn:{c}" if pd.notna(c) else f"name:{name_key(n)}"
+        f"chn:{c}" if pd.notna(c)
+        else f"chn:{chn_by_name[name_key(n)]}" if name_key(n) in chn_by_name
+        else f"name:{name_key(n)}"
         for c, n in zip(seen.chn_team_id, seen.name)
     ]
 

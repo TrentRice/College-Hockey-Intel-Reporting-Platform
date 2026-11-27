@@ -1,0 +1,49 @@
+{
+  "name": "win_model_women_v1",
+  "league": "women",
+  "trained_on": {
+    "season": "2025-26",
+    "games": 579,
+    "rules": "D-I vs D-I that season, complete box scores only, ties dropped, both teams >= 3 games played"
+  },
+  "trained_at": "2026-11-27",
+  "features": [
+    "diff_shots_for_pg_season",
+    "diff_adj_goal_diff_pg",
+    "diff_pdo_season"
+  ],
+  "home_ice_switch": "1 = home game, 0 = neutral site; no separate intercept",
+  "model": {
+    "type": "LogisticRegression",
+    "penalty": "l2",
+    "C": 1.0,
+    "fit_intercept": false,
+    "scaling": "StandardScaler(with_mean=False) on the stat features"
+  },
+  "coefficients": {
+    "diff_shots_for_pg_season": 1.0112386620234954,
+    "diff_adj_goal_diff_pg": 0.820301118859796,
+    "diff_pdo_season": -0.34707130056573116,
+    "home_ice": 0.0770977174570642
+  },
+  "feature_scales": {
+    "diff_shots_for_pg_season": 9.239073648214804,
+    "diff_adj_goal_diff_pg": 2.1286777978659184,
+    "diff_pdo_season": 0.03951973863816178
+  },
+  "sklearn_version": "1.9.1",
+  "sha256": "04fe0e404000dab74e8fc7eccd5c9b0ad328864963d581278b3b0c5f36ed037d",
+  "test_runs": [
+    {
+      "run_at": "2026-11-27",
+      "season": "2026-27",
+      "games": 244,
+      "through": "2026-11-24",
+      "log_loss": 0.6266,
+      "auc": 0.753,
+      "accuracy": 0.701,
+      "baseline_home_rate_log_loss": 0.6949,
+      "baseline_win_pct_log_loss": 0.6209
+    }
+  ]
+}

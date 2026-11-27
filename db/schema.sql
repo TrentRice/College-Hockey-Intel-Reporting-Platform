@@ -57,6 +57,10 @@ CREATE TABLE team_seasons (
     team_id        INTEGER NOT NULL REFERENCES teams,
     season         TEXT NOT NULL REFERENCES seasons,
     conference     TEXT REFERENCES conferences,       -- NULL for non-D1
+    -- D-I that season. A program can move up: women's Franklin Pierce, Saint Anselm,
+    -- Saint Michael's and Post were non-D-I in 2025-26 and D-I in 2026-27. Use this, not
+    -- teams.is_d1 (the team's latest status), for anything about a past season's games.
+    is_d1          BOOLEAN GENERATED ALWAYS AS (conference IS NOT NULL) STORED,
     PRIMARY KEY (team_id, season)
 );
 

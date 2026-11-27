@@ -42,7 +42,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from src.ingestion.chn_team_schedule_scraper import Season
+from src.ingestion.chn_team_schedule_scraper import LEAGUE, Season
 from src.ingestion.http import HEADERS, RobotsDisallowed, check_robots
 
 REQUEST_DELAY = 2.0  # seconds between requests; be polite to a small, ad-supported site
@@ -58,11 +58,11 @@ _last_request = 0.0
 
 
 def games_csv_path(root: Path, season: Season) -> Path:
-    return root / f"data/processed/chn/all_games_{season.tag}.csv"
+    return root / LEAGUE.processed("chn", f"all_games_{season.tag}.csv")
 
 
 def box_dir(root: Path, season: Season) -> Path:
-    return root / f"data/raw/chn/boxscores/{season.tag}"
+    return root / LEAGUE.raw("boxscores", season.tag)
 
 
 def box_path(root: Path, season: Season, game_id: str) -> Path:

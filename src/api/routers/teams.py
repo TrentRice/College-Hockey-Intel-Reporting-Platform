@@ -37,10 +37,10 @@ def list_teams(
     return fetch_all(
         conn,
         """
-        SELECT t.team_id, t.name, t.is_d1, t.chn_team_id, ts.conference
+        SELECT t.team_id, t.name, ts.is_d1, t.chn_team_id, ts.conference
         FROM teams t JOIN team_seasons ts ON ts.team_id = t.team_id AND ts.season = %(season)s
         WHERE (%(conference)s::text IS NULL OR ts.conference ILIKE %(conference)s)
-          AND (NOT %(d1_only)s OR t.is_d1)
+          AND (NOT %(d1_only)s OR ts.is_d1)
           AND (%(search)s::text IS NULL OR EXISTS (
                 SELECT 1 FROM team_aliases a
                 WHERE a.team_id = t.team_id AND a.alias ILIKE '%%' || %(search)s || '%%'))

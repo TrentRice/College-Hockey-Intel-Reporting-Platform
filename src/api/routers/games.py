@@ -223,8 +223,11 @@ def game_prediction(
     row = fetch_one(
         conn,
         f"""
-        SELECT {GAME_COLUMNS}, g.game_date, h.is_d1 AS home_d1, a.is_d1 AS away_d1
+        SELECT {GAME_COLUMNS}, g.game_date,
+               COALESCE(hs.is_d1, FALSE) AS home_d1, COALESCE(aws.is_d1, FALSE) AS away_d1
         {GAME_JOINS}
+        LEFT JOIN team_seasons hs  ON hs.team_id  = g.home_team_id AND hs.season  = g.season
+        LEFT JOIN team_seasons aws ON aws.team_id = g.away_team_id AND aws.season = g.season
         WHERE g.game_id = %(g)s
         """,
         {"g": game_id},
@@ -279,7 +282,13 @@ def matchup_prediction(
     teams = {}
     for tid in (home_team_id, away_team_id):
         require_team(conn, tid)
-        teams[tid] = fetch_one(conn, "SELECT team_id, name, is_d1 FROM teams WHERE team_id = %(t)s", {"t": tid})
+        teams[tid] = fetch_one(
+            conn,
+            "SELECT t.team_id, t.name, COALESCE(ts.is_d1, FALSE) AS is_d1 FROM teams t "
+            "LEFT JOIN team_seasons ts ON ts.team_id = t.team_id AND ts.season = %(s)s "
+            "WHERE t.team_id = %(t)s",
+            {"t": tid, "s": season},
+        )
         if not teams[tid]["is_d1"]:
             raise HTTPException(422, "The model covers D-I teams only")
     before = as_of or dt.date.today()

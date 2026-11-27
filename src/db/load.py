@@ -29,6 +29,7 @@ from pathlib import Path
 
 import pandas as pd
 import psycopg
+from psycopg import sql
 
 from config.settings import settings
 from src.transform.id_mapping import DATA_DIR, NOT_PLAYERS, OUT_DIR, UNKNOWN_SCORER, load, name_key
@@ -266,6 +267,23 @@ def copy_table(conn: psycopg.Connection, table: str, df: pd.DataFrame) -> int:
     return len(df)
 
 
+def ensure_database(database_url: str) -> None:
+    """Create the URL's database if it doesn't exist yet: each league has its own on the same
+    server (config/leagues.py), and the women's one is new the first time it's loaded."""
+    try:
+        psycopg.connect(database_url).close()
+        return
+    except psycopg.OperationalError as e:
+        if "does not exist" not in str(e):
+            raise
+    head, _, tail = database_url.rpartition("/")
+    name, query = (tail.split("?", 1) + [""])[:2]
+    admin = f"{head}/postgres" + (f"?{query}" if query else "")
+    with psycopg.connect(admin, autocommit=True) as conn:
+        conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+    log.info("created database %s", name)
+
+
 def load_database(database_url: str, tables: dict[str, pd.DataFrame]) -> dict[str, int]:
     counts = {}
     with psycopg.connect(database_url) as conn:  # one transaction; commits on success
@@ -332,6 +350,7 @@ def main() -> None:
     start = time.perf_counter()
     tables = build_tables(args.data_dir, args.ids_dir)
     try:
+        ensure_database(args.database_url)
         with refresh_guard(args.database_url):
             counts = load_database(args.database_url, tables)
     except psycopg.OperationalError as e:
