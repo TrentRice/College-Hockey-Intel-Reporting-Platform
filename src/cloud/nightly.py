@@ -31,6 +31,7 @@ import psycopg
 from config import leagues
 from config.settings import settings
 from src.cloud.runs import RUNS_FILE, export_runs, import_runs, runs_today
+from src.db.load import ensure_database
 from src.pipeline.backup import BACKUP_DIR, backups, restore_predictions
 from src.pipeline.refresh import KEEP_LOGS, LOG_DIR, refresh
 from src.pipeline.scheduler import should_run
@@ -61,6 +62,9 @@ def main() -> None:
         sys.exit(0)
 
     url = settings.database_url
+    # The job's Postgres is new each run and has only the default database: create the
+    # league's (hockey_women) before anything connects to it
+    ensure_database(url)
     with psycopg.connect(url, autocommit=True) as conn:
         print(f"Run history: {import_runs(conn, RUNS_FILE)} earlier runs")
     if found := backups(BACKUP_DIR):
